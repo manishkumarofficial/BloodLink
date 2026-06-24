@@ -1,0 +1,6 @@
+{
+  "name": "BloodLink AI",
+  "description": "Connecting Blood Donors and Patients in Real-Time, Saving Lives Faster.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
