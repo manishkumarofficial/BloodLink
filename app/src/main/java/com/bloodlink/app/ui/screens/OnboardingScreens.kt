@@ -2,9 +2,7 @@ package com.bloodlink.app.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -20,9 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -333,12 +335,14 @@ fun OnboardingCarousel(onNavigateNext: () -> Unit) {
 
 @Composable
 fun LoginScreen(
-    onSendOtp: (mobile: String) -> Unit,
+    onLogin: (email: String, String) -> Unit,
     onCreateAccount: () -> Unit,
-    onGoogleSignIn: () -> Unit
+    errorMessage: String? = null
 ) {
-    var mobileNo by remember { mutableStateOf("") }
-    var validationError by remember { mutableStateOf<String?>(null) }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var localError by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = Modifier
@@ -349,8 +353,10 @@ fun LoginScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             // Firebase Status Indicator Badge
             val isFirebaseConnected = remember { com.bloodlink.app.FirebaseConfigService.isInitialized }
@@ -361,7 +367,7 @@ fun LoginScreen(
                     MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 },
                 shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(
+                border = BorderStroke(
                     width = 1.dp,
                     color = if (isFirebaseConnected) {
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
@@ -381,9 +387,9 @@ fun LoginScreen(
                             .size(8.dp)
                             .background(
                                 color = if (isFirebaseConnected) {
-                                    androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                                    Color(0xFF4CAF50)
                                 } else {
-                                    androidx.compose.ui.graphics.Color(0xFFFF9800)
+                                    Color(0xFFFF9800)
                                 },
                                 shape = CircleShape
                             )
@@ -437,63 +443,122 @@ fun LoginScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Mobile Number",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                OutlinedTextField(
-                    value = mobileNo,
-                    onValueChange = { 
-                        if (it.all { char -> char.isDigit() } && it.length <= 10) {
-                            mobileNo = it
-                            validationError = null
-                        }
-                    },
-                    placeholder = { Text("Enter your 10-digit number") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Smartphone,
-                            contentDescription = "Phone"
-                        )
-                    },
-                    isError = validationError != null,
-                    modifier = Modifier.fillMaxWidth(),
+            // Display Authentication/Validation errors
+            val displayError = localError ?: errorMessage
+            if (displayError != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                    )
-                )
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Error,
+                            contentDescription = "Error",
+                            tint = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            text = displayError,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
 
-                if (validationError != null) {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column {
                     Text(
-                        text = validationError ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 4.dp)
+                        text = "Email Address",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { 
+                            email = it
+                            localError = null
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Email,
+                                contentDescription = "Email"
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        ),
+                        singleLine = true
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Column {
+                    Text(
+                        text = "Password",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { 
+                            password = it
+                            localError = null
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "Password"
+                            )
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = if (passwordVisible) "Hide Password" else "Show Password"
+                                )
+                            }
+                        },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        ),
+                        singleLine = true
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Button(
                     onClick = {
-                        if (mobileNo.length != 10) {
-                            validationError = "Mobile number must contain exactly 10 digits."
+                        if (email.isBlank() || password.isBlank()) {
+                            localError = "Email and Password are required."
                         } else {
-                            validationError = null
-                            onSendOtp(mobileNo)
+                            localError = null
+                            onLogin(email.trim(), password)
                         }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(56.dp)
+                        .testTag("login_button"),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
@@ -502,7 +567,7 @@ fun LoginScreen(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "Send OTP",
+                            text = "Login",
                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -515,59 +580,9 @@ fun LoginScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(36.dp))
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-                Text(
-                    text = "Or continue with",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 12.dp)
-                )
-                HorizontalDivider(
-                    modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            OutlinedButton(
-                onClick = onGoogleSignIn,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Login,
-                        contentDescription = "Google",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Google Sign In",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(40.dp))
-
-            Row(horizontalArrangement = Arrangement.Center) {
+            Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.padding(bottom = 16.dp)) {
                 Text(
                     text = "Don't have an account? ",
                     style = MaterialTheme.typography.bodyMedium,
@@ -587,231 +602,32 @@ fun LoginScreen(
 }
 
 @Composable
-fun LoginOtpVerificationScreen(
-    mobileNumber: String,
-    timerSeconds: Int,
-    resendAllowed: Boolean,
-    simulatedOtp: String,
-    onVerify: (otp: String) -> Unit,
-    onResend: () -> Unit,
-    onBack: () -> Unit
-) {
-    var otpValue by remember { mutableStateOf("") }
-    var otpError by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.align(Alignment.Start)
-            ) {
-                Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Surface(
-                modifier = Modifier
-                    .size(68.dp)
-                    .border(1.2.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = "Lock",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(34.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "OTP Verification",
-                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "OTP sent to:\n+91 " + mobileNumber.chunked(5).joinToString(" "),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-            if (simulatedOtp == "FIREBASE_SENT") {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "A secure verification code has been sent via SMS by Firebase Authentication.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            } else if (simulatedOtp == "AUTO") {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Phone number automatically verified via Firebase instant validation.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            } else if (simulatedOtp.isNotEmpty()) {
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Simulated SMS Gateway OTP:",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Text(
-                            text = simulatedOtp,
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = 4.sp),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Column(modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = otpValue,
-                    onValueChange = { 
-                        if (it.all { char -> char.isDigit() } && it.length <= 6) {
-                            otpValue = it
-                            otpError = null
-                        }
-                    },
-                    placeholder = { Text("Enter 6-digit OTP") },
-                    leadingIcon = {
-                        Icon(imageVector = Icons.Default.Pin, contentDescription = "OTP Icon")
-                    },
-                    isError = otpError != null,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                    )
-                )
-
-                if (otpError != null) {
-                    Text(
-                        text = otpError ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Button(
-                    onClick = {
-                        if (otpValue.length != 6) {
-                            otpError = "Please enter 6 digits."
-                        } else {
-                            onVerify(otpValue)
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text(
-                        text = "Verify OTP",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (resendAllowed) {
-                    TextButton(onClick = {
-                        otpValue = ""
-                        onResend()
-                    }) {
-                        Text("Resend OTP", fontWeight = FontWeight.Bold)
-                    }
-                } else {
-                    Text(
-                        text = "Resend OTP in " + timerSeconds + "s",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun RegistrationScreen(
-    onContinue: (name: String, mobile: String, email: String, dob: String, gender: String) -> Unit,
-    onBack: () -> Unit
+    onCreateAccount: (fullName: String, email: String, passwordPlain: String, phoneNumber: String, bloodGroup: String, gender: String, location: String) -> Unit,
+    onBack: () -> Unit,
+    errorMessage: String? = null
 ) {
-    var name by remember { mutableStateOf("") }
-    var mobile by remember { mutableStateOf("") }
+    var fullName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
-    var dob by remember { mutableStateOf("") }
-    var gender by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
+    var bloodGroup by remember { mutableStateOf("O+") }
+    var gender by remember { mutableStateOf("Male") }
+    var location by remember { mutableStateOf("") }
 
-    var nameError by remember { mutableStateOf(false) }
-    var mobileError by remember { mutableStateOf(false) }
-    var dobError by remember { mutableStateOf(false) }
-    var genderError by remember { mutableStateOf(false) }
+    var fullNameError by remember { mutableStateOf<String?>(null) }
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    var confirmPasswordError by remember { mutableStateOf<String?>(null) }
+    var phoneNumberError by remember { mutableStateOf<String?>(null) }
+    var locationError by remember { mutableStateOf<String?>(null) }
+    var localError by remember { mutableStateOf<String?>(null) }
 
+    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
+
+    val bloodGroups = listOf("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")
     val genders = listOf("Male", "Female", "Prefer not to say")
 
     Box(
@@ -824,98 +640,250 @@ fun RegistrationScreen(
                 .fillMaxSize()
                 .padding(24.dp)
         ) {
-            IconButton(onClick = onBack) {
-                Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
+                }
+                Text(
+                    text = "Create Account",
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                text = "Create Account",
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            Text(
-                text = "Enter your profile details to proceed.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
+            val displayError = localError ?: errorMessage
+            if (displayError != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Error,
+                            contentDescription = "Error",
+                            tint = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            text = displayError,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
 
             Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Column {
                     Text("Full Name *", style = MaterialTheme.typography.labelLarge)
                     Spacer(modifier = Modifier.height(4.dp))
                     OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it; nameError = false },
-                        placeholder = { Text("E.g., Alex Rivera") },
-                        isError = nameError,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    if (nameError) {
-                        Text("Name is required", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-
-                Column {
-                    Text("Mobile Number *", style = MaterialTheme.typography.labelLarge)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    OutlinedTextField(
-                        value = mobile,
+                        value = fullName,
                         onValueChange = { 
-                            if (it.all { char -> char.isDigit() } && it.length <= 10) {
-                                mobile = it
-                                mobileError = false
-                            }
+                            fullName = it
+                            fullNameError = null
+                            localError = null
                         },
-                        placeholder = { Text("10-digit number") },
-                        isError = mobileError,
+                        isError = fullNameError != null,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
                     )
-                    if (mobileError) {
-                        Text("10-digit mobile number is required", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                    if (fullNameError != null) {
+                        Text(fullNameError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                     }
                 }
 
                 Column {
-                    Text("Email (Optional)", style = MaterialTheme.typography.labelLarge)
+                    Text("Email Address *", style = MaterialTheme.typography.labelLarge)
                     Spacer(modifier = Modifier.height(4.dp))
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
-                        placeholder = { Text("E.g., alex@example.com") },
+                        onValueChange = { 
+                            email = it
+                            emailError = null
+                            localError = null
+                        },
+                        isError = emailError != null,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
                     )
+                    if (emailError != null) {
+                        Text(emailError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                    }
                 }
 
                 Column {
-                    Text("Date of Birth *", style = MaterialTheme.typography.labelLarge)
+                    Text("Password * (min 6 characters)", style = MaterialTheme.typography.labelLarge)
                     Spacer(modifier = Modifier.height(4.dp))
                     OutlinedTextField(
-                        value = dob,
-                        onValueChange = { dob = it; dobError = false },
-                        placeholder = { Text("E.g., Oct 14, 1992") },
-                        isError = dobError,
+                        value = password,
+                        onValueChange = { 
+                            password = it
+                            passwordError = null
+                            localError = null
+                        },
+                        isError = passwordError != null,
+                        leadingIcon = { Icon(imageVector = Icons.Default.Lock, contentDescription = "Lock") },
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = "Toggle"
+                                )
+                            }
+                        },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
                     )
-                    if (dobError) {
-                        Text("Date of birth is required", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                    if (passwordError != null) {
+                        Text(passwordError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                Column {
+                    Text("Confirm Password *", style = MaterialTheme.typography.labelLarge)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = confirmPassword,
+                        onValueChange = { 
+                            confirmPassword = it
+                            confirmPasswordError = null
+                            localError = null
+                        },
+                        isError = confirmPasswordError != null,
+                        leadingIcon = { Icon(imageVector = Icons.Default.Lock, contentDescription = "Lock") },
+                        trailingIcon = {
+                            IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                                Icon(
+                                    imageVector = if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = "Toggle"
+                                )
+                            }
+                        },
+                        visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                    if (confirmPasswordError != null) {
+                        Text(confirmPasswordError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                Column {
+                    Text("Phone Number *", style = MaterialTheme.typography.labelLarge)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = phoneNumber,
+                        onValueChange = { 
+                            if (it.all { char -> char.isDigit() } && it.length <= 10) {
+                                phoneNumber = it
+                                phoneNumberError = null
+                                localError = null
+                            }
+                        },
+                        isError = phoneNumberError != null,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                    if (phoneNumberError != null) {
+                        Text(phoneNumberError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                Column {
+                    Text("Location / Area *", style = MaterialTheme.typography.labelLarge)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = location,
+                        onValueChange = { 
+                            location = it
+                            locationError = null
+                            localError = null
+                        },
+                        isError = locationError != null,
+                        leadingIcon = { Icon(imageVector = Icons.Default.LocationOn, contentDescription = "Location") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                    if (locationError != null) {
+                        Text(locationError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                Column {
+                    Text("Blood Group *", style = MaterialTheme.typography.labelLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            bloodGroups.take(4).forEach { bg ->
+                                val isSelected = bloodGroup == bg
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { bloodGroup = bg },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLowest,
+                                    border = BorderStroke(
+                                        width = if (isSelected) 1.5.dp else 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                                    )
+                                ) {
+                                    Box(modifier = Modifier.padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+                                        Text(bg, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface)
+                                    }
+                                }
+                            }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            bloodGroups.drop(4).forEach { bg ->
+                                val isSelected = bloodGroup == bg
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { bloodGroup = bg },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLowest,
+                                    border = BorderStroke(
+                                        width = if (isSelected) 1.5.dp else 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                                    )
+                                ) {
+                                    Box(modifier = Modifier.padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+                                        Text(bg, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
                 Column {
                     Text("Gender *", style = MaterialTheme.typography.labelLarge)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -925,10 +893,10 @@ fun RegistrationScreen(
                             Surface(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clickable { gender = option; genderError = false },
+                                    .clickable { gender = option },
                                 shape = RoundedCornerShape(12.dp),
                                 color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLowest,
-                                border = androidx.compose.foundation.BorderStroke(
+                                border = BorderStroke(
                                     width = if (isSelected) 1.5.dp else 1.dp,
                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
                                 )
@@ -948,253 +916,43 @@ fun RegistrationScreen(
                             }
                         }
                     }
-                    if (genderError) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Gender selection is required", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = {
-                    nameError = name.isBlank()
-                    mobileError = mobile.length != 10
-                    dobError = dob.isBlank()
-                    genderError = gender.isBlank()
-
-                    if (!nameError && !mobileError && !dobError && !genderError) {
-                        onContinue(name, mobile, email, dob, gender)
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text("Continue", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
-            }
-        }
-    }
-}
-
-@Composable
-fun RegistrationOtpVerificationScreen(
-    mobileNumber: String,
-    timerSeconds: Int,
-    resendAllowed: Boolean,
-    simulatedOtp: String,
-    onVerify: suspend (otp: String) -> Boolean,
-    onResend: () -> Unit,
-    onBack: () -> Unit,
-    onSuccess: () -> Unit
-) {
-    val scope = rememberCoroutineScope()
-    var otpValue by remember { mutableStateOf("") }
-    var otpError by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.align(Alignment.Start)
-            ) {
-                Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Surface(
-                modifier = Modifier
-                    .size(68.dp)
-                    .border(1.2.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.VerifiedUser,
-                        contentDescription = "Verified Icon",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(34.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "Verify Mobile",
-                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Verification SMS sent to:\n+91 " + mobileNumber.chunked(5).joinToString(" "),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-            if (simulatedOtp == "FIREBASE_SENT") {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "A secure verification code has been sent via SMS by Firebase Authentication.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            } else if (simulatedOtp == "AUTO") {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Phone number automatically verified via Firebase instant validation.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            } else if (simulatedOtp.isNotEmpty()) {
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Simulated Register OTP:",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Text(
-                            text = simulatedOtp,
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = 4.sp),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Column(modifier = Modifier.fillMaxWidth()) {
-                OutlinedTextField(
-                    value = otpValue,
-                    onValueChange = { 
-                        if (it.all { char -> char.isDigit() } && it.length <= 6) {
-                            otpValue = it
-                            otpError = null
-                        }
-                    },
-                    placeholder = { Text("Enter 6-digit OTP") },
-                    leadingIcon = {
-                        Icon(imageVector = Icons.Default.Pin, contentDescription = "OTP")
-                    },
-                    isError = otpError != null,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                    )
-                )
-
-                if (otpError != null) {
-                    Text(
-                        text = otpError ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
                     onClick = {
-                        if (otpValue.length != 6) {
-                            otpError = "Please enter 6 digits."
+                        fullNameError = if (fullName.isBlank()) "Full name is required." else null
+                        emailError = if (email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) "A valid email address is required." else null
+                        passwordError = if (password.length < 6) "Password must be at least 6 characters." else null
+                        confirmPasswordError = if (confirmPassword != password) "Passwords do not match." else null
+                        phoneNumberError = if (phoneNumber.length != 10) "10-digit phone number is required." else null
+                        locationError = if (location.isBlank()) "Location is required." else null
+
+                        if (fullNameError == null && emailError == null && passwordError == null &&
+                            confirmPasswordError == null && phoneNumberError == null && locationError == null
+                        ) {
+                            localError = null
+                            onCreateAccount(
+                                fullName.trim(),
+                                email.trim(),
+                                password,
+                                phoneNumber,
+                                bloodGroup,
+                                gender,
+                                location.trim()
+                            )
                         } else {
-                            isLoading = true
-                            scope.launch {
-                                val success = onVerify(otpValue)
-                                if (success) {
-                                    isLoading = false
-                                    onSuccess()
-                                } else {
-                                    isLoading = false
-                                    otpError = "Invalid OTP. Please try again."
-                                }
-                            }
+                            localError = "Please check validation errors above."
                         }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(56.dp)
+                        .testTag("register_button"),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Text(
-                        text = "Verify & Proceed",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (resendAllowed) {
-                    TextButton(onClick = {
-                        otpValue = ""
-                        onResend()
-                    }) {
-                        Text("Resend OTP", fontWeight = FontWeight.Bold)
-                    }
-                } else {
-                    Text(
-                        text = "Resend OTP in " + timerSeconds + "s",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("Create Account", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
                 }
             }
         }
@@ -1211,69 +969,87 @@ fun RoleSelectionScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color(0xFF121212)) // Dark Background
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Back Button
             IconButton(
                 onClick = onBack,
                 modifier = Modifier.align(Alignment.Start)
             ) {
-                Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
+                Icon(
+                    imageVector = Icons.Default.ArrowBack, 
+                    contentDescription = "Back",
+                    tint = Color.White
+                )
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Title
             Text(
-                text = "Choose Your Path",
+                text = "Choose Your Role",
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = Color.White
                 ),
                 textAlign = TextAlign.Center
             )
+            
             Spacer(modifier = Modifier.height(8.dp))
+            
+            // Subtitle
             Text(
-                text = "Select your primary role within the BloodLink AI ecosystem to customize your experience and tools.",
+                text = "Select how you would like to use BloodLink.",
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Color.Gray,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
 
-            Spacer(modifier = Modifier.height(30.dp))
+            Spacer(modifier = Modifier.height(36.dp))
 
+            // Cards Column
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 RoleCard(
-                    title = "Blood Donor",
-                    description = "I want to help and save lives by donating blood regularly.",
-                    icon = Icons.Default.VolunteerActivism,
+                    title = "❤️ I'm a Blood Donor",
+                    description = "Donate blood and save lives by responding to nearby blood requests and participating in donation camps.",
+                    icon = Icons.Default.Bloodtype,
                     isSelected = selectedRole == UserRole.Donor,
                     onClick = { selectedRole = UserRole.Donor }
                 )
 
                 RoleCard(
-                    title = "Blood Requester",
-                    description = "I need blood for a patient or a specific medical emergency.",
+                    title = "🩸 Request Blood",
+                    description = "Create emergency blood requests and find nearby eligible donors.",
                     icon = Icons.Default.LocalHospital,
                     isSelected = selectedRole == UserRole.Requester,
                     onClick = { selectedRole = UserRole.Requester }
                 )
 
                 RoleCard(
-                    title = "Camp Organizer",
-                    description = "I want to organize a donation drive and mobilize the community.",
+                    title = "🏥 Camp Organiser",
+                    description = "Create and manage blood donation camps, registrations, attendance and donation verification.",
                     icon = Icons.Default.Campaign,
-                    isSelected = selectedRole == UserRole.Organizer,
-                    onClick = { selectedRole = UserRole.Organizer }
+                    isSelected = selectedRole == UserRole.CampOrganizer,
+                    onClick = { selectedRole = UserRole.CampOrganizer }
                 )
             }
 
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Action Button
             Button(
                 onClick = {
                     selectedRole?.let { onRoleSelected(it) }
@@ -1281,11 +1057,14 @@ fun RoleSelectionScreen(
                 enabled = selectedRole != null,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .height(56.dp)
+                    .testTag("role_selection_continue_button"),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                    containerColor = Color(0xFFC62828), // Blood red primary color
+                    disabledContainerColor = Color(0xFF2C2C2C),
+                    contentColor = Color.White,
+                    disabledContentColor = Color.Gray
                 )
             ) {
                 Row(
@@ -1294,15 +1073,18 @@ fun RoleSelectionScreen(
                 ) {
                     Text(
                         text = "Continue",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold, color = if (selectedRole != null) Color.White else Color.Gray)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = "Forward"
+                        contentDescription = "Forward",
+                        tint = if (selectedRole != null) Color.White else Color.Gray
                     )
                 }
             }
+            
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -1386,7 +1168,6 @@ fun RoleSetupDonorScreen(
                     OutlinedTextField(
                         value = location,
                         onValueChange = { location = it; locationError = false },
-                        placeholder = { Text("E.g., Tech Park, Suite 200") },
                         isError = locationError,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
@@ -1413,7 +1194,6 @@ fun RoleSetupDonorScreen(
                     OutlinedTextField(
                         value = emergencyContact,
                         onValueChange = { emergencyContact = it },
-                        placeholder = { Text("Mobile number") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
@@ -1495,7 +1275,6 @@ fun RoleSetupRequesterScreen(
                     OutlinedTextField(
                         value = location,
                         onValueChange = { location = it; locationError = false },
-                        placeholder = { Text("E.g., North Wing District") },
                         isError = locationError,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
@@ -1511,7 +1290,6 @@ fun RoleSetupRequesterScreen(
                     OutlinedTextField(
                         value = defaultHospital,
                         onValueChange = { defaultHospital = it },
-                        placeholder = { Text("E.g., St. Jude Medical Center") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
@@ -1595,7 +1373,6 @@ fun RoleSetupOrganizerScreen(
                     OutlinedTextField(
                         value = organizationName,
                         onValueChange = { organizationName = it; nameError = false },
-                        placeholder = { Text("E.g., Lions Club Metro") },
                         isError = nameError,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
@@ -1657,7 +1434,6 @@ fun RoleSetupOrganizerScreen(
                     OutlinedTextField(
                         value = location,
                         onValueChange = { location = it; locationError = false },
-                        placeholder = { Text("E.g., Suite 400, Professional Blvd") },
                         isError = locationError,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
@@ -1771,36 +1547,68 @@ fun RoleCard(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.05f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "scale"
+    )
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(onClick = onClick)
+            .testTag("role_card_${title.replace(" ", "_").lowercase()}"),
+        shape = RoundedCornerShape(20.dp),
         border = androidx.compose.foundation.BorderStroke(
             width = if (isSelected) 2.dp else 1.dp,
-            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
+            color = if (isSelected) Color(0xFFEF5350) else Color(0xFF333333)
         ),
-        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceContainerLowest,
-        shadowElevation = if (isSelected) 4.dp else 2.dp
+        color = Color.Transparent,
+        shadowElevation = if (isSelected) 8.dp else 2.dp
     ) {
+        val backgroundBrush = if (isSelected) {
+            Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF8E0000), // Deep crimson
+                    Color(0xFFC62828)  // Blood Red
+                )
+            )
+        } else {
+            Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF1E1E1E),
+                    Color(0xFF1E1E1E)
+                )
+            )
+        }
+
         Box(
-            modifier = Modifier.padding(20.dp)
+            modifier = Modifier
+                .background(backgroundBrush)
+                .padding(24.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 Surface(
                     shape = CircleShape,
-                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.size(56.dp)
+                    color = if (isSelected) Color(0xFFFFFFFF).copy(alpha = 0.2f) else Color(0xFF2C2C2C),
+                    modifier = Modifier.size(60.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = icon,
                             contentDescription = title,
-                            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(28.dp)
+                            tint = if (isSelected) Color.White else Color(0xFFEF5350),
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }
@@ -1809,26 +1617,26 @@ fun RoleCard(
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = Color.White
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = description,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isSelected) Color.White.copy(alpha = 0.9f) else Color.LightGray
                     )
                 }
 
                 if (isSelected) {
                     Surface(
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
+                        color = Color.White,
+                        modifier = Modifier.size(26.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = "Selected",
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = Color(0xFFC62828),
                             modifier = Modifier.padding(4.dp)
                         )
                     }

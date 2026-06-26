@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Brush
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.bloodlink.app.ui.BloodLinkUiState
 import com.bloodlink.app.ui.ClientProfile
+import com.bloodlink.app.ui.UserRole
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
@@ -308,10 +310,10 @@ fun HomeDashboardScreen(
                 Button(
                     onClick = {
                         onDismissBirthday()
-                        onNavigateCamps() // gift a donation acts as finding camps or booking slot
+                        onNavigateCamps()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Text("Gift a Donation", fontWeight = FontWeight.Bold)
                 }
@@ -332,7 +334,7 @@ fun HomeDashboardScreen(
             title = {
                 Text(
                     text = "Happy Birthday, ${state.profile.name}!",
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 )
             },
             text = {
@@ -342,20 +344,19 @@ fun HomeDashboardScreen(
                     textAlign = TextAlign.Center
                 )
             },
-            shape = RoundedCornerShape(24.dp),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface
         )
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF8F9FA))) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 100.dp)
         ) {
-            // Screen header
+            // Screen header (Greeting Card Base)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -370,7 +371,7 @@ fun HomeDashboardScreen(
                 ) {
                     Surface(
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        color = Color(0xFFF1F3F4),
                         modifier = Modifier.size(44.dp)
                     ) {
                         if (state.profile.profilePictureUri != null) {
@@ -387,8 +388,8 @@ fun HomeDashboardScreen(
                                     .background(
                                         Brush.linearGradient(
                                             colors = listOf(
-                                                MaterialTheme.colorScheme.primary,
-                                                MaterialTheme.colorScheme.secondary
+                                                Color(0xFFC62828),
+                                                Color(0xFFEF5350)
                                             )
                                         )
                                     ),
@@ -408,34 +409,37 @@ fun HomeDashboardScreen(
                         }
                     }
                     Column {
-                        Text(text = "Good Morning,", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(text = state.profile.name, style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary))
+                        Text(text = "Good Morning,", style = MaterialTheme.typography.labelSmall, color = Color(0xFF616161))
+                        Text(text = state.profile.name, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = Color(0xFF212121)))
                     }
                 }
 
                 Surface(
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Color(0xFFDFE1E5)),
+                    shadowElevation = 1.dp,
                     modifier = Modifier
                         .size(44.dp)
                         .clickable { onNavigateNotifications() }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(imageVector = Icons.Default.Notifications, contentDescription = "Notifications", tint = MaterialTheme.colorScheme.primary)
+                        Icon(imageVector = Icons.Default.Notifications, contentDescription = "Notifications", tint = Color(0xFFC62828))
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
+            // Cooldown alert if active
             if (state.profile.cooldownCountdownDays > 0) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp, vertical = 8.dp),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)),
-                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFDFE1E5))
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
@@ -444,328 +448,471 @@ fun HomeDashboardScreen(
                     ) {
                         Surface(
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(52.dp)
+                            color = Color(0xFFB00020),
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = state.profile.cooldownCountdownDays.toString(),
-                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = Color.White)
-                                )
+                                Icon(imageVector = Icons.Default.HourglassBottom, contentDescription = "Cooldown", tint = Color.White)
                             }
                         }
-                        
                         Column(modifier = Modifier.weight(1f)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.HourglassBottom,
-                                    contentDescription = "Hours",
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = "Donation Cooldown Active",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Rest Period: ${state.profile.cooldownCountdownDays} Days Left",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                text = "Rest Period Active: ${state.profile.cooldownCountdownDays} Days Left",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF212121))
                             )
-                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "To ensure body recuperation, you must wait 90 days (males) or 120 days (females) between blood units.",
+                                text = "To ensure body recuperation, you must wait between blood units. Your availability is paused.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = Color(0xFF616161)
                             )
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
             }
 
-            val activeReg = state.campRegistrations.find { it.donorId == state.profile.id && it.status != "Donation Completed" && it.status != "Donation Rejected" }
-            if (activeReg != null) {
-                val camp = state.nearbyCamps.find { it.id == activeReg.campId }
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Campaign,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Text(
-                                    text = "UPCOMING CAMP APPOINTMENT",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, letterSpacing = 0.5.sp)
-                                )
-                            }
-                            
-                            Box(
-                                modifier = Modifier
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 8.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = activeReg.status.uppercase(),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
-                                )
-                            }
-                        }
-                        
-                        Column {
-                            Text(
-                                text = camp?.title ?: "City Center Comm. Drive",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "${camp?.dateText ?: "Oct 24 - 26, 2026"} • Slot: ${activeReg.selectedSlot}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        
-                        Button(
-                            onClick = onNavigateCampPass,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.QrCode,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = "Show QR Pass",
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            }
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            // State card
+            // GREETING HERO CARD with BLOOD GROUP BADGE
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                border = borderStroke()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFDFE1E5))
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(imageVector = Icons.Default.Bloodtype, contentDescription = "Active style", tint = MaterialTheme.colorScheme.primary)
-                            }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(imageVector = Icons.Default.Favorite, contentDescription = null, tint = Color(0xFFC62828), modifier = Modifier.size(20.dp))
+                            Text(
+                                text = "LIFE-SAVER PROFILE",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFFC62828), letterSpacing = 1.sp)
+                            )
                         }
-                        Column {
-                            Text(text = "Donor Status", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                            Text(text = if (state.profile.isAvailable) "You are ready to donate." else "Offline state.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Every donor is a local hero.",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = Color(0xFF212121))
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        
+                        // Availability Switch
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Switch(
+                                checked = state.profile.isAvailable,
+                                onCheckedChange = { onToggleAvailability(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Color(0xFFC62828),
+                                    uncheckedThumbColor = Color(0xFF9E9E9E),
+                                    uncheckedTrackColor = Color(0xFFF1F3F4)
+                                )
+                            )
+                            Text(
+                                text = if (state.profile.isAvailable) "Available for Requests" else "Unavailable (Offline)",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = if (state.profile.isAvailable) Color(0xFFC62828) else Color(0xFF616161)
+                            )
                         }
                     }
 
-                    Column(horizontalAlignment = Alignment.End) {
-                        Switch(
-                            checked = state.profile.isAvailable,
-                            onCheckedChange = { onToggleAvailability(it) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                uncheckedThumbColor = MaterialTheme.colorScheme.secondary,
-                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        )
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // BLOOD GROUP BADGE
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(72.dp)
+                                .background(
+                                    Brush.radialGradient(
+                                        colors = listOf(Color(0xFFEF5350), Color(0xFFC62828))
+                                    ),
+                                    shape = CircleShape
+                                )
+                                .shadow(2.dp, shape = CircleShape)
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.Bloodtype,
+                                    contentDescription = "Blood drop",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = state.profile.bloodGroup,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = if (state.profile.isAvailable) "Available" else "Busy",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = if (state.profile.isAvailable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "Blood Group",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFF616161))
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // DONATION STATISTICS SECTION
+            Text(
+                text = "Donation Statistics",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF212121)),
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp)
+            )
 
-            // Stats grid row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Card(
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                    border = borderStroke()
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFDFE1E5))
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(imageVector = Icons.Default.Favorite, contentDescription = "Love", tint = MaterialTheme.colorScheme.primary)
+                        Icon(imageVector = Icons.Default.Favorite, contentDescription = "Total Donations", tint = Color(0xFFC62828), modifier = Modifier.size(28.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = state.profile.totalDonations.toString(),
-                            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
                         )
-                        Text(text = "Total Donations", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = "Total Donations", style = MaterialTheme.typography.labelSmall, color = Color(0xFF616161))
                     }
                 }
 
                 Card(
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                    border = borderStroke()
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFDFE1E5))
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(imageVector = Icons.Default.VolunteerActivism, contentDescription = "Saved Lives", tint = MaterialTheme.colorScheme.primary)
+                        Icon(imageVector = Icons.Default.VolunteerActivism, contentDescription = "Lives Saved", tint = Color(0xFFC62828), modifier = Modifier.size(28.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = state.profile.livesSaved.toString(),
-                            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
                         )
-                        Text(text = "Lives Saved", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = "Lives Saved", style = MaterialTheme.typography.labelSmall, color = Color(0xFF616161))
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Progress level card
+            // Level Progress Card
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                border = borderStroke()
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFDFE1E5))
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Box(modifier = Modifier.size(64.dp), contentAlignment = Alignment.Center) {
-                        val color = MaterialTheme.colorScheme.primary
+                    Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                        val strokeColor = Color(0xFFC62828)
                         Canvas(modifier = Modifier.fillMaxSize()) {
-                            drawCircle(color = Color.LightGray.copy(alpha = 0.2f), style = Stroke(width = 6.dp.toPx()))
+                            drawCircle(color = Color(0xFFF1F3F4), style = Stroke(width = 4.dp.toPx()))
                             drawArc(
-                                color = color,
+                                color = strokeColor,
                                 startAngle = -90f,
                                 sweepAngle = (state.profile.xp.toFloat() / 1000f) * 360f,
                                 useCenter = false,
-                                style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
+                                style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
                             )
                         }
-                        Icon(imageVector = Icons.Default.MilitaryTech, contentDescription = "Medal", tint = MaterialTheme.colorScheme.primary)
+                        Icon(imageVector = Icons.Default.MilitaryTech, contentDescription = "Level progress badge", tint = Color(0xFFC62828), modifier = Modifier.size(24.dp))
                     }
 
                     Column(modifier = Modifier.padding(start = 16.dp).weight(1f)) {
-                        Text(text = "Silver Hero", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                        Text(text = "Current Level", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = state.profile.level, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF212121)))
+                        Text(text = "Level Progress", style = MaterialTheme.typography.labelSmall, color = Color(0xFF616161))
                     }
-                    Text(text = "${state.profile.xp} / 1000 XP", style = MaterialTheme.typography.labelSmall)
+                    Text(text = "${state.profile.xp} / 1000 XP", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFF212121)))
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            // NEARBY REQUESTS SECTION with RED ACCENT STRIPS
+            Text(
+                text = "Nearby Emergency Requests",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF212121)),
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 8.dp)
+            )
 
-            // Main options bento grid
-            Column(
+            if (state.activeRequests.isEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFDFE1E5))
+                ) {
+                    Box(modifier = Modifier.padding(24.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("No urgent requests nearby.", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF616161))
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    state.activeRequests.take(3).forEach { request ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            border = BorderStroke(1.dp, Color(0xFFDFE1E5))
+                        ) {
+                            Box {
+                                // RED ACCENT STRIP ON THE LEFT
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.CenterStart)
+                                        .height(110.dp)
+                                        .width(6.dp)
+                                        .background(Color(0xFFC62828))
+                                )
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 18.dp, top = 16.dp, bottom = 16.dp, end = 16.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(Color(0xFFB00020), RoundedCornerShape(4.dp))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (request.isCritical) "CRITICAL" else "URGENT",
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color.White)
+                                                )
+                                            }
+                                            Text(
+                                                text = "• ${request.distanceText}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = Color(0xFF616161)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = request.hospitalName,
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF212121))
+                                        )
+                                        Text(
+                                            text = "Status: ${request.patientStatus}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color(0xFF616161)
+                                        )
+                                    }
+
+                                    // Blood badge
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(52.dp)
+                                            .background(Color(0xFFF8F9FA), shape = CircleShape)
+                                            .border(1.5.dp, Color(0xFFC62828), shape = CircleShape)
+                                    ) {
+                                        Text(
+                                            text = request.bloodGroup,
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // UPCOMING CAMPS SECTION
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Upcoming Blood Drives",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF212121))
+                )
+                TextButton(onClick = onNavigateCamps) {
+                    Text("View All", color = Color(0xFFC62828), style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                }
+            }
+
+            if (state.nearbyCamps.isEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFDFE1E5))
+                ) {
+                    Box(modifier = Modifier.padding(24.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("No active camps scheduled.", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF616161))
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    state.nearbyCamps.take(2).forEach { camp ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable { onNavigateCamps() },
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            border = BorderStroke(1.dp, Color(0xFFDFE1E5))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFFF8F9FA),
+                                    modifier = Modifier.size(56.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(imageVector = Icons.Default.CalendarMonth, contentDescription = "Camp icon", tint = Color(0xFFC62828), modifier = Modifier.size(28.dp))
+                                    }
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = camp.title,
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF212121))
+                                    )
+                                    Text(
+                                        text = camp.organizer,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF616161)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "${camp.dateText} • ${camp.timeText}",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = Color(0xFFC62828)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // RECENT NOTIFICATIONS SECTION
+            Text(
+                text = "Recent Notifications",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF212121)),
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 8.dp)
+            )
+
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFDFE1E5))
             ) {
-                Text(text = "Quick Tools", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(Color(0xFFE53935).copy(alpha = 0.1f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(imageVector = Icons.Default.Campaign, contentDescription = "System Update", tint = Color(0xFFC62828), modifier = Modifier.size(18.dp))
+                        }
+                        Column {
+                            Text(text = "System Update: BloodLink Redesign Live", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF212121)))
+                            Text(text = "Enjoy our completely new premium healthcare design system.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF616161))
+                        }
+                    }
 
-                BentoCard(
-                    title = "Find Donors Nearby",
-                    description = "Locate available blood donors in your immediate vicinity.",
-                    icon = Icons.Default.Map,
-                    onClick = onNavigateHistory
-                )
+                    HorizontalDivider(color = Color(0xFFF1F3F4))
 
-                BentoCard(
-                    title = "Upcoming Camps",
-                    description = "Discover and register for blood donation drives near you.",
-                    icon = Icons.Default.CalendarMonth,
-                    onClick = onNavigateCamps
-                )
-
-                BentoCard(
-                    title = "Donation History",
-                    description = "Review your past donations, health metrics, and overall impact.",
-                    icon = Icons.Default.History,
-                    onClick = onNavigateHistory
-                )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(Color(0xFF2E7D32).copy(alpha = 0.1f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "Status check", tint = Color(0xFF2E7D32), modifier = Modifier.size(18.dp))
+                        }
+                        Column {
+                            Text(text = "Eligibility Confirmed", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF212121)))
+                            Text(text = "You are currently eligible and available to donate blood.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF616161))
+                        }
+                    }
+                }
             }
         }
 
-        // Float emergency FAB
+        // Float emergency FAB (16dp rounded corners, elevation, white text, deep blood red background)
         Button(
             onClick = onNavigateRequestBlood,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 80.dp, end = 20.dp)
+                .padding(bottom = 24.dp, end = 20.dp)
                 .height(56.dp)
                 .animateContentSize(),
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(imageVector = Icons.Default.Emergency, contentDescription = "Emergency")
-                Text("REQUEST BLOOD", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp))
+                Icon(imageVector = Icons.Default.Emergency, contentDescription = "Emergency", tint = Color.White)
+                Text("REQUEST BLOOD", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp, color = Color.White))
             }
         }
     }
@@ -811,7 +958,9 @@ fun UserProfileScreen(
     onSave: (ClientProfile) -> Unit,
     onLogout: () -> Unit,
     onNavigateSettings: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onManageCamp: (String) -> Unit = {},
+    onViewCamp: (String) -> Unit = {}
 ) {
     var isAvailable by remember { mutableStateOf(state.profile.isAvailable) }
     var radius by remember { mutableFloatStateOf(state.profile.travelRadiusKm.toFloat()) }
@@ -1069,6 +1218,116 @@ fun UserProfileScreen(
                         }
                     }
                     Icon(imageVector = Icons.Default.MoreVert, contentDescription = "More")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(text = "My Blood Camps", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+
+            // Filter camps organized by this user
+            val organizedCamps = state.nearbyCamps.filter { it.organizerId == state.profile.id || it.organizer == state.profile.name }
+            // Filter camps joined/registered by this user
+            val registeredCamps = state.nearbyCamps.filter { camp ->
+                state.campRegistrations.any { it.campId == camp.id && it.donorId == state.profile.id }
+            }
+
+            if (organizedCamps.isEmpty() && registeredCamps.isEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                    border = borderStroke()
+                ) {
+                    Box(modifier = Modifier.padding(24.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "You haven't organized or registered for any camps yet.", 
+                            color = Color.Gray, 
+                            style = MaterialTheme.typography.bodyMedium, 
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                if (organizedCamps.isNotEmpty()) {
+                    Text(text = "Organized Campaigns", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
+                    organizedCamps.forEach { camp ->
+                        val regCount = state.campRegistrations.count { it.campId == camp.id }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                            border = borderStroke()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = camp.title, fontWeight = FontWeight.Bold)
+                                    Text(text = "${camp.dateText} • ${camp.address}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                    Text(
+                                        text = if (camp.status == "Cancelled") "Cancelled" else "$regCount Donors Registered", 
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = if (camp.status == "Cancelled") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
+                                Button(
+                                    onClick = { onManageCamp(camp.id) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Text("Manage", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (registeredCamps.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(text = "Registered Appointments", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.secondary)
+                    registeredCamps.forEach { camp ->
+                        val registration = state.campRegistrations.find { it.campId == camp.id && it.donorId == state.profile.id }
+                        val regStatus = registration?.status ?: "Registered"
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                            border = borderStroke()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = camp.title, fontWeight = FontWeight.Bold)
+                                    Text(text = "${camp.dateText} • Venue: ${camp.address}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                    Text(
+                                        text = "Status: $regStatus", 
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = when(regStatus) {
+                                            "Donation Completed" -> Color(0xFF4CAF50)
+                                            "Donation Rejected" -> MaterialTheme.colorScheme.error
+                                            "Checked In" -> MaterialTheme.colorScheme.primary
+                                            else -> MaterialTheme.colorScheme.secondary
+                                        }
+                                    )
+                                }
+
+                                Button(
+                                    onClick = { onViewCamp(camp.id) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                                ) {
+                                    Text("View Pass", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1834,8 +2093,10 @@ fun SettingsScreen(
     state: BloodLinkUiState,
     onToggleMute: () -> Unit,
     onToggleLocationSharing: () -> Unit,
+    onChangeRole: () -> Unit,
     isSeedingAllowed: Boolean = false,
     onSeedData: () -> Unit = {},
+    onLogout: () -> Unit = {},
     onBack: () -> Unit
 ) {
     var pushEnabled by remember { mutableStateOf(true) }
@@ -1924,6 +2185,42 @@ fun SettingsScreen(
                 }
             }
 
+            // Account & Role settings
+            Text(text = "Account", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("change_role_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                border = borderStroke()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onChangeRole() }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(text = "Change Role", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold))
+                            Text(
+                                text = "Current role: ${
+                                    when (state.currentRole) {
+                                        UserRole.Donor -> "Donor"
+                                        UserRole.Requester -> "Requester"
+                                        UserRole.CampOrganizer -> "Camp Organiser"
+                                        else -> "Not Selected"
+                                    }
+                                }",
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        Icon(imageVector = Icons.Default.KeyboardArrowRight, contentDescription = "Change Role")
+                    }
+                }
+            }
+
             // Regional & Language settings
             Text(text = "System", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
             Card(
@@ -1975,6 +2272,22 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = onLogout,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .testTag("settings_logout_button"),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Logout, contentDescription = "Logout")
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Logout", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
             }
 
             // Quick App Metadata / Version

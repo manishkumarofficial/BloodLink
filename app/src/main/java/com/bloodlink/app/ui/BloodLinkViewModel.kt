@@ -1,7 +1,8 @@
 package com.bloodlink.app.ui
 
+import android.app.Application
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bloodlink.app.FirebaseConfigService
 import com.bloodlink.app.BuildConfig
@@ -14,16 +15,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import com.google.firebase.auth.PhoneAuthProvider
-import com.google.firebase.auth.PhoneAuthOptions
-import com.google.firebase.auth.PhoneAuthCredential
-import com.google.firebase.FirebaseException
-import java.util.concurrent.TimeUnit
 
 enum class UserRole {
     Donor,
     Requester,
-    Organizer
+    CampOrganizer
 }
 
 data class DonationHistoryRecord(
@@ -103,7 +99,29 @@ data class DonationCamp(
     val bloodGroupsNeeded: List<String>,
     val imageUrl: String,
     val mapUrl: String,
-    val isUrgent: Boolean = false
+    val isUrgent: Boolean = false,
+    val campName: String = "",
+    val organizerName: String = "",
+    val organization: String = "",
+    val phone: String = "",
+    val email: String = "",
+    val date: String = "",
+    val startTime: String = "",
+    val endTime: String = "",
+    val city: String = "",
+    val state: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    val description: String = "",
+    val bannerUrl: String = "",
+    val participantsCount: Int = 0,
+    val maxParticipants: Int = 100,
+    val status: String = "Active",
+    val facilities: List<String> = emptyList(),
+    val parkingAvailable: Boolean = true,
+    val refreshmentsAvailable: Boolean = true,
+    val medicalTeamDetails: String = "",
+    val organizerId: String = ""
 )
 
 data class FirestoreUser(
@@ -159,7 +177,12 @@ data class BloodLinkUiState(
     val firebaseUserReady: Boolean = false
 )
 
-class BloodLinkViewModel : ViewModel() {
+class BloodLinkViewModel(application: Application) : AndroidViewModel(application) {
+    private val sessionManager = SessionManager(application)
+    val isLoggedIn = sessionManager.isLoggedIn
+    val userId = sessionManager.userId
+    val userEmail = sessionManager.userEmail
+
     private val _uiState = MutableStateFlow(BloodLinkUiState())
     val uiState: StateFlow<BloodLinkUiState> = _uiState.asStateFlow()
 
@@ -219,7 +242,29 @@ class BloodLinkViewModel : ViewModel() {
                                     bloodGroupsNeeded = c.bloodGroupsNeeded,
                                     imageUrl = c.imageUrl,
                                     mapUrl = c.mapUrl,
-                                    isUrgent = c.isUrgent
+                                    isUrgent = c.isUrgent,
+                                    campName = c.campName,
+                                    organizerName = c.organizerName,
+                                    organization = c.organization,
+                                    phone = c.phone,
+                                    email = c.email,
+                                    date = c.date,
+                                    startTime = c.startTime,
+                                    endTime = c.endTime,
+                                    city = c.city,
+                                    state = c.state,
+                                    latitude = c.latitude,
+                                    longitude = c.longitude,
+                                    description = c.description,
+                                    bannerUrl = c.bannerUrl,
+                                    participantsCount = c.participantsCount,
+                                    maxParticipants = c.maxParticipants,
+                                    status = c.status,
+                                    facilities = c.facilities,
+                                    parkingAvailable = c.parkingAvailable,
+                                    refreshmentsAvailable = c.refreshmentsAvailable,
+                                    medicalTeamDetails = c.medicalTeamDetails,
+                                    organizerId = c.organizerId
                                 )
                             }
                         )
@@ -262,8 +307,8 @@ class BloodLinkViewModel : ViewModel() {
     }
 
     fun isSeedingAllowed(): Boolean {
-        // Disabled in production & release builds, and disabled for real Firebase projects
-        return BuildConfig.DEBUG && FirebaseConfigService.isFallback
+        // Disabled completely since fallback mode is removed and we are on standard google-services.json
+        return false
     }
 
     fun seedDebugDataManual() {
@@ -328,7 +373,9 @@ class BloodLinkViewModel : ViewModel() {
                 )
             )
             for (r in defaults) {
-                db.collection("blood_requests").document(r.id).set(r).await()
+                FirebaseConfigService.runLoggedWrite("blood_requests", r.id, r) {
+                    db.collection("blood_requests").document(r.id).set(r).await()
+                }
             }
         }
 
@@ -379,7 +426,9 @@ class BloodLinkViewModel : ViewModel() {
                 )
             )
             for (c in defaults) {
-                db.collection("camps").document(c.id).set(c).await()
+                FirebaseConfigService.runLoggedWrite("camps", c.id, c) {
+                    db.collection("camps").document(c.id).set(c).await()
+                }
             }
         }
     }
@@ -468,207 +517,140 @@ class BloodLinkViewModel : ViewModel() {
         }
     }
 
-    fun sendLoginOtp(mobileNumber: String, activity: android.app.Activity? = null) {
-        _uiState.update {
-            it.copy(
-                authMobileNumber = mobileNumber,
-                authError = null,
-                authSentOtp = "",
-                verificationId = ""
-            )
-        }
-        
-        val auth = com.bloodlink.app.FirebaseConfigService.auth
-        if (auth == null) {
-            _uiState.update {
-                it.copy(
-                    authError = "Firebase Auth failed to initialize. Please check your network and google-services.json configuration."
-                )
-            }
-            return
-        }
-        if (activity == null) {
-            _uiState.update {
-                it.copy(
-                    authError = "Required Activity context is missing. Real Phone authentication cannot proceed."
-                )
-            }
-            return
-        }
-
-        Log.i("BloodLinkViewModel", "sendLoginOtp: Attempting real Firebase Phone Auth for: $mobileNumber")
-        try {
-            val formattedPhone = if (mobileNumber.startsWith("+")) mobileNumber else "+91$mobileNumber"
-            
-            val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
-                override fun onVerificationCompleted(credential: PhoneAuthCredential) {
-                    Log.i("BloodLinkViewModel", "PhoneAuth: onVerificationCompleted called.")
-                    viewModelScope.launch {
-                        try {
-                            val result = auth.signInWithCredential(credential).await()
-                            Log.i("BloodLinkViewModel", "PhoneAuth: Automatically signed in successfully: ${result.user?.uid}")
-                            _uiState.update { 
-                                it.copy(
-                                    verificationId = "",
-                                    firebaseUserReady = true,
-                                    authSentOtp = "AUTO",
-                                    authError = null
-                                ) 
-                            }
-                        } catch (e: Exception) {
-                            Log.e("BloodLinkViewModel", "PhoneAuth: Auto-sign in failed: ${e.message}")
-                            _uiState.update { it.copy(authError = "Automatic sign-in failed: ${e.message}") }
+    fun login(email: String, password: String, onSuccess: (userRole: String) -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(authError = null) }
+            try {
+                val user = BloodRepository.getUserProfileByEmail(email)
+                if (user != null) {
+                    val hashedPassword = PasswordHashUtility.hashPassword(password)
+                    if (user.passwordHash == hashedPassword) {
+                        sessionManager.saveSession(user.userId, user.email)
+                        setupUserListeners(user.userId)
+                        val roleEnum = when (user.role) {
+                            "Donor" -> UserRole.Donor
+                            "CampOrganizer", "Organizer" -> UserRole.CampOrganizer
+                            "Requester" -> UserRole.Requester
+                            else -> null
                         }
+                        _uiState.update {
+                            it.copy(
+                                currentRole = roleEnum,
+                                profile = ClientProfile(
+                                    id = user.userId,
+                                    name = user.fullName,
+                                    mobile = user.phoneNumber,
+                                    birthDate = user.dateOfBirth,
+                                    gender = user.gender,
+                                    bloodGroup = user.bloodGroup,
+                                    travelRadiusKm = user.travelRadius,
+                                    isAvailable = user.availabilityStatus,
+                                    lastDonationDate = user.lastDonationDate.ifBlank { null },
+                                    nextEligibleDate = user.nextEligibleDate.ifBlank { null },
+                                    cooldownStatus = user.cooldownStatus,
+                                    totalDonations = user.donationCount,
+                                    livesSaved = user.livesSaved,
+                                    level = user.heroLevel
+                                )
+                            )
+                        }
+                        onSuccess(user.role)
+                    } else {
+                        _uiState.update { it.copy(authError = "Invalid Email or Password") }
                     }
+                } else {
+                    _uiState.update { it.copy(authError = "Invalid Email or Password") }
                 }
-
-                override fun onVerificationFailed(e: FirebaseException) {
-                    Log.e("BloodLinkViewModel", "PhoneAuth: onVerificationFailed: code/msg: ${e.message}", e)
-                    val errorCode = if (e is com.google.firebase.auth.FirebaseAuthException) e.errorCode else "N/A"
-                    val errorMessage = e.message ?: "No error message provided"
-                    val exceptionType = e.javaClass.name
-                    _uiState.update { 
-                        it.copy(
-                            authSentOtp = "",
-                            verificationId = "",
-                            authError = errorMessage,
-                            authErrorCode = errorCode,
-                            authErrorMessage = errorMessage,
-                            authExceptionType = exceptionType,
-                            showAuthErrorDialog = true
-                        ) 
-                    }
-                }
-
-                override fun onCodeSent(id: String, token: PhoneAuthProvider.ForceResendingToken) {
-                    Log.i("BloodLinkViewModel", "PhoneAuth: onCodeSent: $id")
-                    _uiState.update { 
-                        it.copy(
-                            verificationId = id,
-                            authSentOtp = "FIREBASE_SENT",
-                            authError = null,
-                            authErrorCode = null,
-                            authErrorMessage = null,
-                            authExceptionType = null,
-                            showAuthErrorDialog = false
-                        ) 
-                    }
-                }
+            } catch (e: Exception) {
+                Log.e("BloodLinkViewModel", "Login error: ${e.message}", e)
+                _uiState.update { it.copy(authError = "An error occurred during login: ${e.message}") }
             }
+        }
+    }
 
-            val options = PhoneAuthOptions.newBuilder(auth)
-                .setPhoneNumber(formattedPhone)
-                .setTimeout(60L, TimeUnit.SECONDS)
-                .setActivity(activity)
-                .setCallbacks(callbacks)
-                .build()
+    fun register(
+        fullName: String,
+        email: String,
+        passwordPlain: String,
+        phoneNumber: String,
+        bloodGroup: String,
+        gender: String,
+        location: String,
+        onSuccess: (userRole: String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(authError = null) }
+            try {
+                val existing = BloodRepository.getUserProfileByEmail(email)
+                if (existing != null) {
+                    _uiState.update { it.copy(authError = "An account with this email already exists.") }
+                    return@launch
+                }
 
-            PhoneAuthProvider.verifyPhoneNumber(options)
-        } catch (t: Throwable) {
-            Log.e("BloodLinkViewModel", "PhoneAuth: Exception during verifyPhoneNumber: ${t.message}", t)
-            val errorCode = if (t is com.google.firebase.auth.FirebaseAuthException) t.errorCode else "N/A"
-            val errorMessage = t.message ?: "No error message provided"
-            val exceptionType = t.javaClass.name
-            _uiState.update {
-                it.copy(
-                    authSentOtp = "",
-                    verificationId = "",
-                    authError = errorMessage,
-                    authErrorCode = errorCode,
-                    authErrorMessage = errorMessage,
-                    authExceptionType = exceptionType,
-                    showAuthErrorDialog = true
+                val newUserId = "user_" + System.currentTimeMillis()
+                val hashedPassword = PasswordHashUtility.hashPassword(passwordPlain)
+                val user = FUser(
+                    userId = newUserId,
+                    fullName = fullName,
+                    phoneNumber = phoneNumber,
+                    email = email,
+                    passwordHash = hashedPassword,
+                    gender = gender,
+                    dateOfBirth = "N/A",
+                    role = "", // trigger choose role path
+                    bloodGroup = bloodGroup,
+                    location = location,
+                    availabilityStatus = true,
+                    completedProfile = true,
+                    donationCount = 0,
+                    livesSaved = 0,
+                    heroLevel = "Level 1 Life-Saver",
+                    createdAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis()
                 )
-            }
-        }
-        
-        _uiState.update {
-            it.copy(
-                authTimerSeconds = 30,
-                authResendAllowed = false
-            )
-        }
-        startOtpTimer()
-    }
 
-    fun resendLoginOtp(activity: android.app.Activity? = null) {
-        sendLoginOtp(_uiState.value.authMobileNumber, activity)
-    }
+                BloodRepository.createUserProfile(user)
+                sessionManager.saveSession(user.userId, user.email)
+                setupUserListeners(user.userId)
 
-    private fun startOtpTimer() {
-        timerJob?.cancel()
-        timerJob = viewModelScope.launch {
-            while (_uiState.value.authTimerSeconds > 0) {
-                delay(1000)
-                _uiState.update { it.copy(authTimerSeconds = it.authTimerSeconds - 1) }
-            }
-            _uiState.update { it.copy(authResendAllowed = true) }
-        }
-    }
-
-    // New real Firestore-integrated authentication handler
-    suspend fun verifyLoginOtp(otp: String): Pair<Boolean, Boolean> {
-        val state = _uiState.value
-        
-        if (state.verificationId.isEmpty()) {
-            _uiState.update { it.copy(authError = "Phone verification was not initiated or has failed.") }
-            return Pair(false, false)
-        }
-
-        try {
-            val auth = com.bloodlink.app.FirebaseConfigService.auth ?: throw IllegalStateException("Firebase Auth not available")
-            val credential = PhoneAuthProvider.getCredential(state.verificationId, otp)
-            val result = auth.signInWithCredential(credential).await()
-            Log.i("BloodLinkViewModel", "PhoneAuth: Manual code entry signed in successfully: ${result.user?.uid}")
-        } catch (e: Exception) {
-            Log.e("BloodLinkViewModel", "PhoneAuth: Manual signInWithCredential failed: ${e.message}")
-            _uiState.update { it.copy(authError = "Invalid verification code: ${e.message}") }
-            return Pair(false, false)
-        }
-
-        val existingUser = BloodRepository.getUserProfileByPhone(state.authMobileNumber)
-        if (existingUser != null) {
-            setupUserListeners(existingUser.userId)
-            val roleEnum = when (existingUser.role) {
-                "Donor" -> UserRole.Donor
-                "Organizer" -> UserRole.Organizer
-                "Requester" -> UserRole.Requester
-                else -> UserRole.Donor
-            }
-            _uiState.update {
-                it.copy(
-                    currentRole = roleEnum,
-                    profile = ClientProfile(
-                        id = existingUser.userId,
-                        name = existingUser.fullName,
-                        mobile = existingUser.phoneNumber,
-                        birthDate = existingUser.dateOfBirth,
-                        gender = existingUser.gender,
-                        bloodGroup = existingUser.bloodGroup,
-                        travelRadiusKm = existingUser.travelRadius,
-                        isAvailable = existingUser.availabilityStatus,
-                        lastDonationDate = existingUser.lastDonationDate.ifBlank { null },
-                        nextEligibleDate = existingUser.nextEligibleDate.ifBlank { null },
-                        cooldownStatus = existingUser.cooldownStatus,
-                        totalDonations = existingUser.donationCount,
-                        livesSaved = existingUser.livesSaved,
-                        level = existingUser.heroLevel
+                _uiState.update {
+                    it.copy(
+                        currentRole = null, // trigger choose role path
+                        profile = ClientProfile(
+                            id = user.userId,
+                            name = user.fullName,
+                            mobile = user.phoneNumber,
+                            birthDate = user.dateOfBirth,
+                            gender = user.gender,
+                            bloodGroup = user.bloodGroup,
+                            travelRadiusKm = user.travelRadius,
+                            isAvailable = user.availabilityStatus,
+                            totalDonations = 0,
+                            livesSaved = 0,
+                            level = "Level 1 Life-Saver"
+                        )
                     )
-                )
+                }
+                onSuccess(user.role)
+            } catch (e: Exception) {
+                Log.e("BloodLinkViewModel", "Registration error: ${e.message}", e)
+                _uiState.update { it.copy(authError = "Registration failed: ${e.message}") }
             }
-            return Pair(true, true)
-        } else {
-            return Pair(true, false)
         }
     }
+
+
+
+
+
 
     fun setupSavedSession(existingUser: com.bloodlink.app.data.FUser) {
         setupUserListeners(existingUser.userId)
         val roleEnum = when (existingUser.role) {
             "Donor" -> UserRole.Donor
-            "Organizer" -> UserRole.Organizer
+            "CampOrganizer", "Organizer" -> UserRole.CampOrganizer
             "Requester" -> UserRole.Requester
-            else -> UserRole.Donor
+            else -> null
         }
         _uiState.update {
             it.copy(
@@ -703,228 +685,55 @@ class BloodLinkViewModel : ViewModel() {
         } catch (e: Exception) {
             Log.e("BloodLinkViewModel", "Error signing out of Firebase Auth: ${e.message}")
         }
+        viewModelScope.launch {
+            sessionManager.clearSession()
+        }
         _uiState.update {
             BloodLinkUiState()
         }
     }
 
-    fun startRegister(name: String, mobile: String, email: String, dob: String, gender: String, activity: android.app.Activity? = null) {
-        _uiState.update {
-            it.copy(
-                currentRegisterName = name,
-                currentRegisterMobile = mobile,
-                currentRegisterEmail = email,
-                currentRegisterDob = dob,
-                currentRegisterGender = gender,
-                authMobileNumber = mobile,
-                authError = null,
-                authSentOtp = "",
-                verificationId = ""
-            )
-        }
-        
-        val auth = com.bloodlink.app.FirebaseConfigService.auth
-        if (auth == null) {
-            _uiState.update {
-                it.copy(
-                    authError = "Firebase Auth failed to initialize. Please check your network and google-services.json configuration."
-                )
-            }
-            return
-        }
-        if (activity == null) {
-            _uiState.update {
-                it.copy(
-                    authError = "Required Activity context is missing. Real Phone authentication cannot proceed."
-                )
-            }
-            return
-        }
 
-        Log.i("BloodLinkViewModel", "startRegister: Attempting real Firebase Phone Auth for: $mobile")
-        try {
-            val formattedPhone = if (mobile.startsWith("+")) mobile else "+91$mobile"
-            
-            val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
-                override fun onVerificationCompleted(credential: PhoneAuthCredential) {
-                    Log.i("BloodLinkViewModel", "Register PhoneAuth: onVerificationCompleted called.")
-                    viewModelScope.launch {
-                        try {
-                            val result = auth.signInWithCredential(credential).await()
-                            Log.i("BloodLinkViewModel", "Register PhoneAuth: Successfully signed in: ${result.user?.uid}")
-                            _uiState.update { 
-                                it.copy(
-                                    verificationId = "",
-                                    firebaseUserReady = true,
-                                    authSentOtp = "AUTO",
-                                    authError = null
-                                ) 
-                            }
-                        } catch (e: Exception) {
-                            Log.e("BloodLinkViewModel", "Register PhoneAuth: Sign in failed: ${e.message}")
-                            _uiState.update { it.copy(authError = "Sign-in failed: ${e.message}") }
-                        }
-                    }
-                }
-
-                override fun onVerificationFailed(e: FirebaseException) {
-                    Log.e("BloodLinkViewModel", "Register PhoneAuth: onVerificationFailed: code/msg: ${e.message}", e)
-                    val errorCode = if (e is com.google.firebase.auth.FirebaseAuthException) e.errorCode else "N/A"
-                    val errorMessage = e.message ?: "No error message provided"
-                    val exceptionType = e.javaClass.name
-                    _uiState.update { 
-                        it.copy(
-                            authSentOtp = "",
-                            verificationId = "",
-                            authError = errorMessage,
-                            authErrorCode = errorCode,
-                            authErrorMessage = errorMessage,
-                            authExceptionType = exceptionType,
-                            showAuthErrorDialog = true
-                        ) 
-                    }
-                }
-
-                override fun onCodeSent(id: String, token: PhoneAuthProvider.ForceResendingToken) {
-                    Log.i("BloodLinkViewModel", "Register PhoneAuth: onCodeSent: $id")
-                    _uiState.update { 
-                        it.copy(
-                            verificationId = id,
-                            authSentOtp = "FIREBASE_SENT",
-                            authError = null,
-                            authErrorCode = null,
-                            authErrorMessage = null,
-                            authExceptionType = null,
-                            showAuthErrorDialog = false
-                        ) 
-                    }
-                }
-            }
-
-            val options = PhoneAuthOptions.newBuilder(auth)
-                .setPhoneNumber(formattedPhone)
-                .setTimeout(60L, TimeUnit.SECONDS)
-                .setActivity(activity)
-                .setCallbacks(callbacks)
-                .build()
-
-            PhoneAuthProvider.verifyPhoneNumber(options)
-        } catch (t: Throwable) {
-            Log.e("BloodLinkViewModel", "Register PhoneAuth: Exception during verifyPhoneNumber: ${t.message}", t)
-            val errorCode = if (t is com.google.firebase.auth.FirebaseAuthException) t.errorCode else "N/A"
-            val errorMessage = t.message ?: "No error message provided"
-            val exceptionType = t.javaClass.name
-            _uiState.update {
-                it.copy(
-                    authSentOtp = "",
-                    verificationId = "",
-                    authError = errorMessage,
-                    authErrorCode = errorCode,
-                    authErrorMessage = errorMessage,
-                    authExceptionType = exceptionType,
-                    showAuthErrorDialog = true
-                )
-            }
-        }
-        
-        _uiState.update {
-            it.copy(
-                authTimerSeconds = 30,
-                authResendAllowed = false
-            )
-        }
-        startOtpTimer()
-    }
-
-    suspend fun verifyRegisterOtp(otp: String): Boolean {
-        val state = _uiState.value
-        
-        if (state.verificationId.isEmpty()) {
-            _uiState.update { it.copy(authError = "Phone verification was not initiated or has failed.") }
-            return false
-        }
-
-        return try {
-            val auth = com.bloodlink.app.FirebaseConfigService.auth ?: throw IllegalStateException("Firebase Auth not available")
-            val credential = PhoneAuthProvider.getCredential(state.verificationId, otp)
-            auth.signInWithCredential(credential).await()
-            Log.i("BloodLinkViewModel", "Register PhoneAuth: Manual code entry signed in successfully.")
-            true
-        } catch (e: Exception) {
-            Log.e("BloodLinkViewModel", "Register PhoneAuth: Manual signInWithCredential failed: ${e.message}")
-            _uiState.update { it.copy(authError = "Invalid verification code: ${e.message}") }
-            false
-        }
-    }
-
-    fun selectRegistrationRole(role: UserRole) {
-        _uiState.update { it.copy(currentSelectedRole = role) }
-    }
-
-    fun setAuthError(message: String) {
-        _uiState.update { it.copy(authError = message) }
-    }
-
-    fun dismissAuthErrorDialog() {
-        _uiState.update { it.copy(showAuthErrorDialog = false) }
-    }
-
-    fun finalizeRegistrationAndCreateAccount(details: Map<String, String>) {
-        val state = _uiState.value
-        val newUserId = "user_" + System.currentTimeMillis()
-        val roleStr = when (state.currentSelectedRole) {
-            UserRole.Donor -> "Donor"
-            UserRole.Organizer -> "Organizer"
-            UserRole.Requester -> "Requester"
-            null -> "Donor"
-        }
-        
-        val user = FUser(
-            userId = newUserId,
-            fullName = state.currentRegisterName,
-            phoneNumber = state.currentRegisterMobile,
-            email = state.currentRegisterEmail,
-            dateOfBirth = state.currentRegisterDob,
-            gender = state.currentRegisterGender,
-            role = roleStr,
-            bloodGroup = details["bloodGroup"] ?: "O+",
-            location = details["location"] ?: "Tech Park Main Lobby",
-            travelRadius = details["travelRadiusKm"]?.toIntOrNull() ?: 50,
-            availabilityStatus = true,
-            completedProfile = true
-        )
-
-        viewModelScope.launch {
-            try {
-                BloodRepository.createUserProfile(user)
-                setupUserListeners(user.userId)
-                
-                _uiState.update {
-                    it.copy(
-                        currentRole = state.currentSelectedRole,
-                        profile = ClientProfile(
-                            id = user.userId,
-                            name = user.fullName,
-                            mobile = user.phoneNumber,
-                            birthDate = user.dateOfBirth,
-                            gender = user.gender,
-                            bloodGroup = user.bloodGroup,
-                            travelRadiusKm = user.travelRadius,
-                            isAvailable = user.availabilityStatus,
-                            totalDonations = 0,
-                            livesSaved = 0,
-                            level = "Level 1 Life-Saver"
-                        )
-                    )
-                }
-            } catch (e: Exception) {
-                Log.e("BloodLinkViewModel", "Error finalizing account creation: ${e.message}")
-            }
-        }
-    }
 
     fun selectRole(role: UserRole) {
         _uiState.update { it.copy(currentRole = role) }
+    }
+
+    fun updateUserRole(role: UserRole, onComplete: () -> Unit) {
+        val currentUserId = _uiState.value.profile.id
+        if (currentUserId.isBlank()) {
+            onComplete()
+            return
+        }
+        
+        viewModelScope.launch {
+            try {
+                val current = BloodRepository.getUserProfile(currentUserId) ?: FUser(userId = currentUserId)
+                val roleStr = when (role) {
+                    UserRole.Donor -> "Donor"
+                    UserRole.Requester -> "Requester"
+                    UserRole.CampOrganizer -> "CampOrganizer"
+                }
+                val updatedUser = current.copy(
+                    role = roleStr,
+                    updatedAt = System.currentTimeMillis()
+                )
+                BloodRepository.updateUserProfile(updatedUser)
+                
+                _uiState.update { 
+                    it.copy(
+                        currentRole = role,
+                        profile = it.profile.copy(
+                            id = currentUserId
+                        )
+                    )
+                }
+                onComplete()
+            } catch (e: Exception) {
+                Log.e("BloodLinkViewModel", "Error updating user role in Firestore: ${e.message}")
+                onComplete()
+            }
+        }
     }
 
     fun updateProfile(profile: ClientProfile) {
@@ -1030,23 +839,76 @@ class BloodLinkViewModel : ViewModel() {
         }
     }
 
-    fun publishCamp(title: String, organizer: String, address: String) {
+    fun publishCamp(
+        campName: String,
+        organizerName: String,
+        organization: String,
+        phone: String,
+        email: String,
+        date: String,
+        startTime: String,
+        endTime: String,
+        address: String,
+        city: String,
+        stateName: String,
+        latitude: Double,
+        longitude: Double,
+        description: String,
+        bannerUrl: String,
+        maxParticipants: Int,
+        bloodGroupsNeeded: List<String>,
+        facilities: List<String>,
+        parkingAvailable: Boolean,
+        refreshmentsAvailable: Boolean,
+        medicalTeamDetails: String
+    ) {
         val state = _uiState.value
         viewModelScope.launch {
             try {
                 val camp = FDonationCamp(
-                    title = title,
-                    organizer = organizer,
+                    title = campName,
+                    organizer = organizerName,
                     organizerId = state.profile.id,
                     address = address,
-                    distanceText = "0.1 mi",
-                    dateText = "Nov 15 - 16",
-                    timeText = "9:00 AM - 5:00 PM",
-                    bloodGroupsNeeded = listOf("All Groups"),
-                    imageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuCwGHyxisPgOArtiO-XpMExa07NS6q-hjXUR_oqw8nZo0lyc517bcB4cQiBKb7u8sczMJZq5wMgk6qGhMtwOlST2YmeP2ssyVV9ww0l7JD8o82CI1H6yo-z7QPqyg6vVHvK4Iwm-0Adk_aFPkW0kueRwk-hNLdAdkuTj9a8EbyfwiNqvfOjJ0_4LfMEA9Y-xI-lnGEtMw-XXTKIKk6viZVeRYfsngAFobYSwGaEkctbO9YLkGcu8sa6NfbSrlEFzhhW0cFwp0_8ZiE",
-                    mapUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuCQbUUITwdRstlGmM_2mv5_ahG8JgdgGouYKsoQ5Nb28qTl30GOkptPiAaM36zxBDiZR1SpWdpYCcTrPs4YOQmTDcITUH9-fznHGv9lQ8MvOBxEM_ZMzw2jVOrdQbhLJVMq3zTn36RjXFpFCmCeWcpy-j8UUZ8fiM-z3PdRrTb66_Sa1Fv7O8W0lNaqtguRH1SEtrFxGzn5LZaHycvBWcdlNhxLkPH5abX5T3f2sYtSqzgZyu7Ii8T-dTEvRRSMcUK_lUhjPhHpJK8"
+                    distanceText = "1.2 mi",
+                    dateText = date,
+                    timeText = "$startTime - $endTime",
+                    bloodGroupsNeeded = bloodGroupsNeeded,
+                    imageUrl = if (bannerUrl.isNotBlank()) bannerUrl else "https://lh3.googleusercontent.com/aida-public/AB6AXuCwGHyxisPgOArtiO-XpMExa07NS6q-hjXUR_oqw8nZo0lyc517bcB4cQiBKb7u8sczMJZq5wMgk6qGhMtwOlST2YmeP2ssyVV9ww0l7JD8o82CI1H6yo-z7QPqyg6vVHvK4Iwm-0Adk_aFPkW0kueRwk-hNLdAdkuTj9a8EbyfwiNqvfOjJ0_4LfMEA9Y-xI-lnGEtMw-XXTKIKk6viZVeRYfsngAFobYSwGaEkctbO9YLkGcu8sa6NfbSrlEFzhhW0cFwp0_8ZiE",
+                    mapUrl = "https://maps.google.com/?q=$latitude,$longitude",
+                    isUrgent = false,
+                    campName = campName,
+                    organizerName = organizerName,
+                    organization = organization,
+                    phone = phone,
+                    email = email,
+                    date = date,
+                    startTime = startTime,
+                    endTime = endTime,
+                    city = city,
+                    state = stateName,
+                    latitude = latitude,
+                    longitude = longitude,
+                    description = description,
+                    bannerUrl = if (bannerUrl.isNotBlank()) bannerUrl else "https://lh3.googleusercontent.com/aida-public/AB6AXuCwGHyxisPgOArtiO-XpMExa07NS6q-hjXUR_oqw8nZo0lyc517bcB4cQiBKb7u8sczMJZq5wMgk6qGhMtwOlST2YmeP2ssyVV9ww0l7JD8o82CI1H6yo-z7QPqyg6vVHvK4Iwm-0Adk_aFPkW0kueRwk-hNLdAdkuTj9a8EbyfwiNqvfOjJ0_4LfMEA9Y-xI-lnGEtMw-XXTKIKk6viZVeRYfsngAFobYSwGaEkctbO9YLkGcu8sa6NfbSrlEFzhhW0cFwp0_8ZiE",
+                    participantsCount = 0,
+                    maxParticipants = maxParticipants,
+                    status = "Active",
+                    facilities = facilities,
+                    parkingAvailable = parkingAvailable,
+                    refreshmentsAvailable = refreshmentsAvailable,
+                    medicalTeamDetails = medicalTeamDetails
                 )
                 BloodRepository.createCamp(camp)
+                
+                // Store registration notification
+                val notification = FNotification(
+                    userId = state.profile.id,
+                    title = "Camp Published",
+                    body = "Your donation camp \"$campName\" has been successfully scheduled and published.",
+                    timestamp = System.currentTimeMillis()
+                )
+                BloodRepository.storeNotification(notification)
             } catch (e: Exception) {
                 Log.e("BloodLinkViewModel", "Error publishing camp: ${e.message}")
             }
@@ -1299,7 +1161,9 @@ class BloodLinkViewModel : ViewModel() {
                 )
                 val db = FirebaseConfigService.firestore
                 if (db != null) {
-                    db.collection("camp_attendance").document(attendance.attendanceId).set(attendance).await()
+                    FirebaseConfigService.runLoggedWrite("camp_attendance", attendance.attendanceId, attendance) {
+                        db.collection("camp_attendance").document(attendance.attendanceId).set(attendance).await()
+                    }
                 } else {
                     Log.w("BloodLinkViewModel", "Cannot record attendance: Firestore instance is null")
                 }
@@ -1401,6 +1265,54 @@ class BloodLinkViewModel : ViewModel() {
                 BloodRepository.updateCampRegistration(updatedReg)
             } catch (e: Exception) {
                 Log.e("BloodLinkViewModel", "rejectCampDonation failed: ${e.message}")
+            }
+        }
+    }
+
+    fun cancelCamp(campId: String) {
+        viewModelScope.launch {
+            try {
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                db.collection("camps").document(campId).update("status", "Cancelled").await()
+                _uiState.update { state ->
+                    val updatedCamps = state.nearbyCamps.map {
+                        if (it.id == campId) it.copy(status = "Cancelled") else it
+                    }
+                    state.copy(nearbyCamps = updatedCamps)
+                }
+            } catch (e: Exception) {
+                Log.e("BloodLinkViewModel", "cancelCamp failed: ${e.message}")
+            }
+        }
+    }
+
+    fun deleteCamp(campId: String) {
+        viewModelScope.launch {
+            try {
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                db.collection("camps").document(campId).delete().await()
+                _uiState.update { state ->
+                    val updatedCamps = state.nearbyCamps.filter { it.id != campId }
+                    state.copy(nearbyCamps = updatedCamps)
+                }
+            } catch (e: Exception) {
+                Log.e("BloodLinkViewModel", "deleteCamp failed: ${e.message}")
+            }
+        }
+    }
+
+    fun updateCamp(campId: String, title: String, address: String, date: String) {
+        viewModelScope.launch {
+            try {
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                val updates = mapOf(
+                    "title" to title,
+                    "address" to address,
+                    "dateText" to date
+                )
+                db.collection("camps").document(campId).update(updates).await()
+            } catch (e: Exception) {
+                Log.e("BloodLinkViewModel", "updateCamp failed: ${e.message}")
             }
         }
     }

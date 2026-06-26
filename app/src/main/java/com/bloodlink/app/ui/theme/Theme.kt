@@ -15,44 +15,32 @@ private val DarkColorScheme =
   darkColorScheme(
     primary = Primary,
     onPrimary = OnPrimary,
-    primaryContainer = PrimaryContainer,
-    onPrimaryContainer = OnPrimaryContainer,
+    primaryContainer = PrimaryVariant,
+    onPrimaryContainer = OnPrimary,
     secondary = Secondary,
     onSecondary = OnSecondary,
-    secondaryContainer = SecondaryContainer,
-    onSecondaryContainer = OnSecondaryContainer,
-    tertiary = Tertiary,
-    onTertiary = OnTertiary,
-    tertiaryContainer = TertiaryContainer,
-    onTertiaryContainer = OnTertiaryContainer,
     background = Color(0xFF121212),
-    onBackground = Color(0xFFF3F0EF),
+    onBackground = Color(0xFFE0E0E0),
     surface = Color(0xFF1E1E1E),
-    onSurface = Color(0xFFF3F0EF),
-    surfaceVariant = Color(0xFF333333),
-    onSurfaceVariant = Color(0xFFCCCCCC),
-    outline = Outline,
-    outlineVariant = OutlineVariant,
-    error = Error,
-    onError = OnError,
-    errorContainer = ErrorContainer,
-    onErrorContainer = OnErrorContainer
+    onSurface = Color(0xFFE0E0E0),
+    surfaceVariant = Color(0xFF2C2C2C),
+    onSurfaceVariant = Color(0xFFB0B0B0),
+    outline = Color(0xFF3C3C3C),
+    outlineVariant = Color(0xFF2C2C2C),
+    error = ErrorColor,
+    onError = OnPrimary,
+    errorContainer = ErrorColor,
+    onErrorContainer = OnPrimary
   )
 
 private val LightColorScheme =
   lightColorScheme(
     primary = Primary,
     onPrimary = OnPrimary,
-    primaryContainer = PrimaryContainer,
-    onPrimaryContainer = OnPrimaryContainer,
+    primaryContainer = Secondary,
+    onPrimaryContainer = OnPrimary,
     secondary = Secondary,
     onSecondary = OnSecondary,
-    secondaryContainer = SecondaryContainer,
-    onSecondaryContainer = OnSecondaryContainer,
-    tertiary = Tertiary,
-    onTertiary = OnTertiary,
-    tertiaryContainer = TertiaryContainer,
-    onTertiaryContainer = OnTertiaryContainer,
     background = Background,
     onBackground = OnBackground,
     surface = Surface,
@@ -61,29 +49,20 @@ private val LightColorScheme =
     onSurfaceVariant = OnSurfaceVariant,
     outline = Outline,
     outlineVariant = OutlineVariant,
-    error = Error,
-    onError = OnError,
-    errorContainer = ErrorContainer,
-    onErrorContainer = OnErrorContainer
+    error = ErrorColor,
+    onError = OnPrimary,
+    errorContainer = ErrorColor,
+    onErrorContainer = OnPrimary
   )
 
 @Composable
 fun MyApplicationTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
-  // Dynamic color is available on Android 12+
-  dynamicColor: Boolean = true,
+  // Disable dynamic color to enforce BloodLink branding strictly
+  dynamicColor: Boolean = false,
   content: @Composable () -> Unit,
 ) {
-  val colorScheme =
-    when {
-      dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-        val context = LocalContext.current
-        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-      }
-
-      darkTheme -> DarkColorScheme
-      else -> LightColorScheme
-    }
+  val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
   MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
 }

@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import com.bloodlink.app.ui.BloodLinkViewModel
 import com.bloodlink.app.ui.UserRole
 import com.bloodlink.app.ui.screens.*
@@ -85,7 +86,7 @@ fun BloodLinkApp() {
             TabItem("Home", Screen.HomeDashboard.route, Icons.Default.Home),
             TabItem("Requests", Screen.ActiveRequests.route, Icons.Default.Bloodtype),
             TabItem("Camps", Screen.NearbyCamps.route, Icons.Default.Campaign),
-            TabItem("Impact", Screen.Achievements.route, Icons.Default.MilitaryTech),
+            TabItem("Alerts", Screen.Notifications.route, Icons.Default.Notifications),
             TabItem("Profile", Screen.UserProfile.route, Icons.Default.Person)
         )
     }
@@ -95,109 +96,9 @@ fun BloodLinkApp() {
         Screen.HomeDashboard.route,
         Screen.ActiveRequests.route,
         Screen.NearbyCamps.route,
-        Screen.Achievements.route,
+        Screen.Notifications.route,
         Screen.UserProfile.route
     )
-
-    if (state.showAuthErrorDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissAuthErrorDialog() },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = "Debug Error",
-                    tint = MaterialTheme.colorScheme.error
-                )
-            },
-            title = {
-                Text(
-                    text = "Firebase Phone Auth Failure",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.error
-                )
-            },
-            text = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "A phone verification failure has occurred during the authentication flow. Below are the precise technical details retrieved directly from the Firebase exception.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = "Error Code:",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Surface(
-                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = state.authErrorCode ?: "N/A",
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
-                                modifier = Modifier.padding(8.dp),
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        }
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = "Error Message:",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = state.authErrorMessage ?: "No message provided",
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(8.dp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = "Exception Type:",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = state.authExceptionType ?: "N/A",
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
-                                modifier = Modifier.padding(8.dp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { viewModel.dismissAuthErrorDialog() }
-                ) {
-                    Text("Dismiss")
-                }
-            }
-        )
-    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -247,19 +148,14 @@ fun BloodLinkApp() {
                 SplashScreen(
                     onNavigateNext = {
                         scope.launch {
-                            val sharedPref = context.getSharedPreferences("bloodlink_session", android.content.Context.MODE_PRIVATE)
-                            val savedPhone = sharedPref.getString("session_phone", null)
-                            if (!savedPhone.isNullOrBlank()) {
+                            val isLoggedInVal = viewModel.isLoggedIn.first()
+                            val userEmailVal = viewModel.userEmail.first()
+                            if (isLoggedInVal && !userEmailVal.isNullOrBlank()) {
                                 try {
-                                    val user = com.bloodlink.app.data.BloodRepository.getUserProfileByPhone(savedPhone)
+                                    val user = com.bloodlink.app.data.BloodRepository.getUserProfileByEmail(userEmailVal)
                                     if (user != null) {
                                         viewModel.setupSavedSession(user)
-                                        val targetRoute = when (user.role) {
-                                            "Organizer" -> Screen.OrganizerDashboard.route
-                                            "Requester" -> Screen.CreateRequest.route
-                                            else -> Screen.HomeDashboard.route
-                                        }
-                                        navController.navigate(targetRoute) {
+                                        navController.navigate(Screen.HomeDashboard.route) {
                                             popUpTo(Screen.Splash.route) { inclusive = true }
                                         }
                                         return@launch
@@ -286,190 +182,68 @@ fun BloodLinkApp() {
                 )
             }
 
-            composable(Screen.Login.route) {
-                val activity = context as? android.app.Activity
+             composable(Screen.Login.route) {
                 LoginScreen(
-                    onSendOtp = { mobile ->
-                        viewModel.sendLoginOtp(mobile, activity)
-                        navController.navigate(Screen.LoginOtpVerification.route)
+                    onLogin = { email, password ->
+                        viewModel.login(email, password) { userRole ->
+                            navController.navigate(Screen.HomeDashboard.route) {
+                                popUpTo(Screen.Login.route) { inclusive = true }
+                            }
+                        }
                     },
                     onCreateAccount = {
                         navController.navigate(Screen.Registration.route)
                     },
-                    onGoogleSignIn = {
-                        viewModel.setAuthError("Google Sign-In has not been configured in the Google Console for this build. Please sign in using your mobile number and standard Firebase Phone OTP.")
-                    }
-                )
-            }
-
-            composable(Screen.LoginOtpVerification.route) {
-                val scope = rememberCoroutineScope()
-                LoginOtpVerificationScreen(
-                    mobileNumber = state.authMobileNumber,
-                    timerSeconds = state.authTimerSeconds,
-                    resendAllowed = state.authResendAllowed,
-                    simulatedOtp = state.authSentOtp,
-                    onVerify = { otp ->
-                        scope.launch {
-                            val result = viewModel.verifyLoginOtp(otp)
-                            if (result.first) {
-                                if (result.second) {
-                                    val sharedPref = context.getSharedPreferences("bloodlink_session", android.content.Context.MODE_PRIVATE)
-                                    sharedPref.edit().putString("session_phone", state.authMobileNumber).apply()
-
-                                    val targetRoute = when (viewModel.uiState.value.currentRole) {
-                                        UserRole.Donor -> Screen.HomeDashboard.route
-                                        UserRole.Organizer -> Screen.OrganizerDashboard.route
-                                        UserRole.Requester -> Screen.CreateRequest.route
-                                        null -> Screen.HomeDashboard.route
-                                    }
-                                    navController.navigate(targetRoute) {
-                                        popUpTo(Screen.Login.route) { inclusive = true }
-                                    }
-                                } else {
-                                    navController.navigate(Screen.Registration.route) {
-                                        popUpTo(Screen.Login.route) { inclusive = true }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    onResend = {
-                        val activity = context as? android.app.Activity
-                        viewModel.resendLoginOtp(activity)
-                    },
-                    onBack = {
-                        navController.popBackStack()
-                    }
+                    errorMessage = state.authError
                 )
             }
 
             composable(Screen.Registration.route) {
-                val scope = rememberCoroutineScope()
                 RegistrationScreen(
-                    onContinue = { name, mobile, email, dob, gender ->
-                        scope.launch {
-                            try {
-                                val existingUser = com.bloodlink.app.data.BloodRepository.getUserProfileByPhone(mobile)
-                                if (existingUser != null) {
-                                    android.widget.Toast.makeText(
-                                        context,
-                                        "An account with this mobile number already exists. Please log in.",
-                                        android.widget.Toast.LENGTH_LONG
-                                    ).show()
-                                    navController.navigate(Screen.Login.route) {
-                                        popUpTo(Screen.Registration.route) { inclusive = true }
-                                    }
-                                } else {
-                                    val activity = context as? android.app.Activity
-                                    viewModel.startRegister(name, mobile, email, dob, gender, activity)
-                                    navController.navigate(Screen.RegistrationOtpVerification.route)
-                                }
-                            } catch (e: Exception) {
-                                val activity = context as? android.app.Activity
-                                viewModel.startRegister(name, mobile, email, dob, gender, activity)
-                                navController.navigate(Screen.RegistrationOtpVerification.route)
+                    onCreateAccount = { name, email, password, phone, bg, gender, loc ->
+                        viewModel.register(
+                            fullName = name,
+                            email = email,
+                            passwordPlain = password,
+                            phoneNumber = phone,
+                            bloodGroup = bg,
+                            gender = gender,
+                            location = loc
+                        ) { userRole ->
+                            navController.navigate(Screen.HomeDashboard.route) {
+                                popUpTo(Screen.Registration.route) { inclusive = true }
                             }
                         }
                     },
                     onBack = {
                         navController.popBackStack()
-                    }
-                )
-            }
-
-            composable(Screen.RegistrationOtpVerification.route) {
-                RegistrationOtpVerificationScreen(
-                    mobileNumber = state.authMobileNumber,
-                    timerSeconds = state.authTimerSeconds,
-                    resendAllowed = state.authResendAllowed,
-                    simulatedOtp = state.authSentOtp,
-                    onVerify = { otp ->
-                        viewModel.verifyRegisterOtp(otp)
                     },
-                    onResend = {
-                        val activity = context as? android.app.Activity
-                        viewModel.resendLoginOtp(activity)
-                    },
-                    onBack = {
-                        navController.popBackStack()
-                    },
-                    onSuccess = {
-                        navController.navigate(Screen.RoleSelection.route)
-                    }
+                    errorMessage = state.authError
                 )
             }
 
             composable(Screen.RoleSelection.route) {
                 RoleSelectionScreen(
-                    onRoleSelected = { chosenRole ->
-                        viewModel.selectRegistrationRole(chosenRole)
-                        val targetRoute = when (chosenRole) {
-                            UserRole.Donor -> Screen.RoleSetupDonor.route
-                            UserRole.Requester -> Screen.RoleSetupRequester.route
-                            UserRole.Organizer -> Screen.RoleSetupOrganizer.route
+                    onRoleSelected = { selectedRole ->
+                        viewModel.updateUserRole(selectedRole) {
+                            val targetRoute = when (selectedRole) {
+                                UserRole.CampOrganizer -> Screen.OrganizerDashboard.route
+                                UserRole.Requester -> Screen.RequestDashboard.route
+                                UserRole.Donor -> Screen.HomeDashboard.route
+                            }
+                            navController.navigate(targetRoute) {
+                                popUpTo(Screen.RoleSelection.route) { inclusive = true }
+                            }
                         }
-                        navController.navigate(targetRoute)
                     },
                     onBack = {
-                        navController.popBackStack()
-                    }
-                )
-            }
-
-            composable(Screen.RoleSetupDonor.route) {
-                RoleSetupDonorScreen(
-                    onComplete = { details ->
-                        viewModel.finalizeRegistrationAndCreateAccount(details)
-                        val sharedPref = context.getSharedPreferences("bloodlink_session", android.content.Context.MODE_PRIVATE)
-                        sharedPref.edit().putString("session_phone", state.currentRegisterMobile).apply()
-                        navController.navigate(Screen.AccountCreationSuccess.route)
-                    },
-                    onBack = {
-                        navController.popBackStack()
-                    }
-                )
-            }
-
-            composable(Screen.RoleSetupRequester.route) {
-                RoleSetupRequesterScreen(
-                    onComplete = { details ->
-                        viewModel.finalizeRegistrationAndCreateAccount(details)
-                        val sharedPref = context.getSharedPreferences("bloodlink_session", android.content.Context.MODE_PRIVATE)
-                        sharedPref.edit().putString("session_phone", state.currentRegisterMobile).apply()
-                        navController.navigate(Screen.AccountCreationSuccess.route)
-                    },
-                    onBack = {
-                        navController.popBackStack()
-                    }
-                )
-            }
-
-            composable(Screen.RoleSetupOrganizer.route) {
-                RoleSetupOrganizerScreen(
-                    onComplete = { details ->
-                        viewModel.finalizeRegistrationAndCreateAccount(details)
-                        val sharedPref = context.getSharedPreferences("bloodlink_session", android.content.Context.MODE_PRIVATE)
-                        sharedPref.edit().putString("session_phone", state.currentRegisterMobile).apply()
-                        navController.navigate(Screen.AccountCreationSuccess.route)
-                    },
-                    onBack = {
-                        navController.popBackStack()
-                    }
-                )
-            }
-
-            composable(Screen.AccountCreationSuccess.route) {
-                AccountCreationSuccessScreen(
-                    onNavigateDashboard = {
-                        val targetRoute = when (viewModel.uiState.value.currentRole) {
-                            UserRole.Donor -> Screen.HomeDashboard.route
-                            UserRole.Organizer -> Screen.OrganizerDashboard.route
-                            UserRole.Requester -> Screen.CreateRequest.route
-                            null -> Screen.HomeDashboard.route
-                        }
-                        navController.navigate(targetRoute) {
-                            popUpTo(Screen.Login.route) { inclusive = true }
+                        if (state.currentRole == null) {
+                            viewModel.logout()
+                            navController.navigate(Screen.Login.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        } else {
+                            navController.popBackStack()
                         }
                     }
                 )
@@ -520,6 +294,9 @@ fun BloodLinkApp() {
                     onNavigateCampDetails = { campId ->
                         viewModel.selectCamp(campId)
                         navController.navigate(Screen.CampDetails.route)
+                    },
+                    onNavigateCreateCamp = {
+                        navController.navigate(Screen.CreateCamp.route)
                     },
                     onNavigateBack = { navController.popBackStack() }
                 )
@@ -601,7 +378,15 @@ fun BloodLinkApp() {
                     onNavigateSettings = {
                         navController.navigate(Screen.Settings.route)
                     },
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onManageCamp = { campId ->
+                        viewModel.selectCamp(campId)
+                        navController.navigate(Screen.OrganizerDashboard.route)
+                    },
+                    onViewCamp = { campId ->
+                        viewModel.selectCamp(campId)
+                        navController.navigate(Screen.CampDetails.route)
+                    }
                 )
             }
 
@@ -624,7 +409,10 @@ fun BloodLinkApp() {
                     onNavigateBack = { navController.popBackStack() },
                     onCheckInDonor = { regId -> viewModel.checkInDonor(regId) },
                     onCompleteDonation = { regId -> viewModel.completeCampDonation(regId) },
-                    onRejectDonation = { regId, reason -> viewModel.rejectCampDonation(regId, reason) }
+                    onRejectDonation = { regId, reason -> viewModel.rejectCampDonation(regId, reason) },
+                    onCancelCamp = { campId -> viewModel.cancelCamp(campId) },
+                    onDeleteCamp = { campId -> viewModel.deleteCamp(campId) },
+                    onUpdateCamp = { campId, title, address, date -> viewModel.updateCamp(campId, title, address, date) }
                 )
             }
 
@@ -632,9 +420,31 @@ fun BloodLinkApp() {
                 CreateCampScreen(
                     state = state,
                     onPublish = { title, host, address ->
-                        viewModel.publishCamp(title, host, address)
-                        navController.navigate(Screen.OrganizerDashboard.route) {
-                            popUpTo(Screen.OrganizerDashboard.route) { inclusive = true }
+                        viewModel.publishCamp(
+                            campName = title,
+                            organizerName = host,
+                            organization = host,
+                            phone = "555-0199",
+                            email = "info@bloodlink.org",
+                            date = "Oct 28, 2026",
+                            startTime = "09:00 AM",
+                            endTime = "05:00 PM",
+                            address = address,
+                            city = "Metropolis",
+                            stateName = "NY",
+                            latitude = 40.7128,
+                            longitude = -74.0060,
+                            description = "Join our mobile blood donation drive and help save lives in our community.",
+                            bannerUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuCK_nMDb8Z_tA5-a_o2fS6vU3W6bI_yXz_qEG8n_8H6m1_f69C97X_s92tVp_z4XG6K5N_287vU8sXLdf7O8Y_f_a4-4vTU-aX5-u9N8_Uo_v-1",
+                            maxParticipants = 150,
+                            bloodGroupsNeeded = listOf("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"),
+                            facilities = listOf("Air Conditioned Lounge", "Sterile Testing Kits", "Pre-Donation Screening"),
+                            parkingAvailable = true,
+                            refreshmentsAvailable = true,
+                            medicalTeamDetails = "Led by Dr. Helen Cho, ARC Medical Director"
+                        )
+                        navController.navigate(Screen.NearbyCamps.route) {
+                            popUpTo(Screen.NearbyCamps.route) { inclusive = true }
                         }
                     },
                     onBack = { navController.popBackStack() }
@@ -686,9 +496,18 @@ fun BloodLinkApp() {
                     onToggleLocationSharing = {
                         viewModel.toggleLocationSharing()
                     },
+                    onChangeRole = {
+                        navController.navigate(Screen.RoleSelection.route)
+                    },
                     isSeedingAllowed = viewModel.isSeedingAllowed(),
                     onSeedData = {
                         viewModel.seedDebugDataManual()
+                    },
+                    onLogout = {
+                        viewModel.logout()
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
                     },
                     onBack = { navController.popBackStack() }
                 )

@@ -81,7 +81,6 @@ fun CreateRequestScreen(
                     value = patientName,
                     onValueChange = { patientName = it },
                     label = { Text("Patient Name") },
-                    placeholder = { Text("Full name of patient") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -104,7 +103,6 @@ fun CreateRequestScreen(
                     value = hospital,
                     onValueChange = { hospital = it },
                     label = { Text("Hospital Name") },
-                    placeholder = { Text("Search hospital...") },
                     leadingIcon = { Icon(imageVector = Icons.Default.LocationOn, contentDescription = "Loc") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -141,7 +139,6 @@ fun CreateRequestScreen(
                         value = contact,
                         onValueChange = { contact = it },
                         label = { Text("Contact Number") },
-                        placeholder = { Text("+1 (555) 000-0000") },
                         modifier = Modifier.weight(1.0f).height(74.dp),
                         shape = RoundedCornerShape(12.dp)
                     )

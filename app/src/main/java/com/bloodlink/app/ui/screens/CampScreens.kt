@@ -20,8 +20,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.testTag
 import coil.compose.AsyncImage
 import com.bloodlink.app.ui.BloodLinkUiState
 import com.bloodlink.app.ui.DonationCamp
@@ -30,79 +32,158 @@ import com.bloodlink.app.ui.DonationCamp
 fun NearbyCampsScreen(
     state: BloodLinkUiState,
     onNavigateCampDetails: (String) -> Unit,
+    onNavigateCreateCamp: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var selectedTab by remember { mutableStateOf("Upcoming") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                AsyncImage(
-                    model = "https://lh3.googleusercontent.com/aida-public/AB6AXuCK_nMDb8Z_tA5-a_o2fS6vU3W6bI_yXz_qEG8n_8H6m1_f69C97X_s92tVp_z4XG6K5N_287vU8sXLdf7O8Y_f_a4-4vTU-aX5-u9N8_Uo_v-1",
-                    contentDescription = "Camps Avatar",
-                    modifier = Modifier.size(40.dp).clip(CircleShape)
-                )
-                Text(text = "Nearby Camps", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary))
-            }
-
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.size(40.dp)) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(imageVector = Icons.Default.Notifications, contentDescription = "Alerts", tint = MaterialTheme.colorScheme.primary)
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onNavigateCreateCamp,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(bottom = 16.dp).testTag("organize_camp_fab")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "Organize")
+                    Text("Organize Camp", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
                 }
             }
-        }
-
-        // Search text field input
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("Search by zipcode, city, address...") },
-            leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = "Search") },
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { innerPadding ->
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        // Filters row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .fillMaxSize()
+                .padding(innerPadding)
         ) {
-            listOf("All Drives", "Urgent Needs Only", "Within 10 miles", "Weekend Only").forEachIndexed { index, label ->
-                val selected = index == 0
-                FilterChip(
-                    selected = selected,
-                    onClick = {},
-                    label = { Text(text = label) }
-                )
+            // Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AsyncImage(
+                        model = "https://lh3.googleusercontent.com/aida-public/AB6AXuCK_nMDb8Z_tA5-a_o2fS6vU3W6bI_yXz_qEG8n_8H6m1_f69C97X_s92tVp_z4XG6K5N_287vU8sXLdf7O8Y_f_a4-4vTU-aX5-u9N8_Uo_v-1",
+                        contentDescription = "Camps Avatar",
+                        modifier = Modifier.size(40.dp).clip(CircleShape)
+                    )
+                    Text(text = "Blood Camps", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary))
+                }
+
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.size(40.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(imageVector = Icons.Default.Notifications, contentDescription = "Alerts", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
             }
-        }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(state.nearbyCamps.size) { index ->
-                val camp = state.nearbyCamps[index]
-                DonationCampCard(camp = camp, onClick = { onNavigateCampDetails(camp.id) })
+            // Search text field input
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = "Search") },
+                placeholder = { Text("Search by camp name or organizer...") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            // Tabs Row
+            TabRow(
+                selectedTabIndex = when (selectedTab) {
+                    "Upcoming" -> 0
+                    "Ongoing" -> 1
+                    "Past" -> 2
+                    else -> 0
+                },
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+            ) {
+                listOf("Upcoming", "Ongoing", "Past").forEach { tab ->
+                    Tab(
+                        selected = selectedTab == tab,
+                        onClick = { selectedTab = tab },
+                        text = { Text(tab, fontWeight = FontWeight.Bold) }
+                    )
+                }
+            }
+
+            // Filters row (Optional extra filters)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("All Drives", "Urgent Only", "Within 10 miles").forEachIndexed { index, label ->
+                    val selected = index == 0
+                    FilterChip(
+                        selected = selected,
+                        onClick = {},
+                        label = { Text(text = label) }
+                    )
+                }
+            }
+
+            val filteredCamps = state.nearbyCamps.filter { camp ->
+                val matchesSearch = camp.title.contains(searchQuery, ignoreCase = true) || camp.organizer.contains(searchQuery, ignoreCase = true)
+                val matchesTab = when (selectedTab) {
+                    "Upcoming" -> camp.status.equals("Active", ignoreCase = true) || camp.status.isBlank()
+                    "Ongoing" -> camp.status.equals("Ongoing", ignoreCase = true) || camp.isUrgent
+                    "Past" -> camp.status.equals("Completed", ignoreCase = true) || camp.status.equals("Past", ignoreCase = true)
+                    else -> true
+                }
+                matchesSearch && matchesTab
+            }
+
+            if (filteredCamps.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No camps found for \"$selectedTab\"",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                ) {
+                    items(filteredCamps.size) { index ->
+                        val camp = filteredCamps[index]
+                        val isRegistered = state.campRegistrations.any { it.campId == camp.id && it.donorId == state.profile.id }
+                        DonationCampCard(
+                            camp = camp,
+                            isRegistered = isRegistered,
+                            onClick = { onNavigateCampDetails(camp.id) },
+                            onRegister = { onNavigateCampDetails(camp.id) }
+                        )
+                    }
+                }
             }
         }
     }
@@ -111,12 +192,15 @@ fun NearbyCampsScreen(
 @Composable
 fun DonationCampCard(
     camp: DonationCamp,
-    onClick: () -> Unit
+    isRegistered: Boolean,
+    onClick: () -> Unit,
+    onRegister: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .testTag("camp_card_${camp.id}"),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
         border = borderStroke()
@@ -142,7 +226,7 @@ fun DonationCampCard(
                             .background(MaterialTheme.colorScheme.error, RoundedCornerShape(12.dp))
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Text(text = "URGENT DRIV", style = MaterialTheme.typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.Bold))
+                        Text(text = "URGENT DRIVE", style = MaterialTheme.typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.Bold))
                     }
                 }
             }
@@ -175,6 +259,11 @@ fun DonationCampCard(
                     }
                 }
 
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(imageVector = Icons.Default.LocationOn, contentDescription = "Address", tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
+                    Text(text = camp.address, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+
                 HorizontalDivider()
 
                 Row(
@@ -183,14 +272,42 @@ fun DonationCampCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Icon(imageVector = Icons.Default.Bloodtype, contentDescription = "Requested Groups", tint = MaterialTheme.colorScheme.primary)
-                        Text(text = "Target Groups: ${camp.bloodGroupsNeeded.joinToString(", ")}", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                        Icon(imageVector = Icons.Default.Group, contentDescription = "Slots", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        val availableSlots = (camp.maxParticipants - camp.participantsCount).coerceAtLeast(0)
+                        Text(text = "Slots: $availableSlots left (${camp.participantsCount} registered)", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
                     }
 
-                    Text(
-                        text = "Register Details",
-                        style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(imageVector = Icons.Default.Bloodtype, contentDescription = "Requested Groups", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        Text(text = camp.bloodGroupsNeeded.joinToString(", "), style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onClick,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Open Details")
+                    }
+
+                    Button(
+                        onClick = onRegister,
+                        enabled = !isRegistered && camp.status != "Completed" && camp.status != "Past",
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isRegistered) Color.Gray else MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text(if (isRegistered) "Registered" else "Register Now")
+                    }
                 }
             }
         }
@@ -612,16 +729,25 @@ fun OrganizerDashboardScreen(
     onNavigateBack: () -> Unit,
     onCheckInDonor: (String) -> Unit,
     onCompleteDonation: (String) -> Unit,
-    onRejectDonation: (String, String) -> Unit
+    onRejectDonation: (String, String) -> Unit,
+    onCancelCamp: (String) -> Unit = {},
+    onDeleteCamp: (String) -> Unit = {},
+    onUpdateCamp: (String, String, String, String) -> Unit = { _, _, _, _ -> }
 ) {
-    // We display stats for Camp ID "1" (the active Downtown Blood Drive)
-    val campId = "1"
+    val campId = if (state.selectedCampId.isNotBlank()) state.selectedCampId else "1"
     val registrations = state.campRegistrations.filter { it.campId == campId }
     val countRegistered = registrations.size
     val countCheckedIn = registrations.filter { it.status == "Checked In" || it.status == "Donation Completed" || it.status == "Donation Rejected" }.size
     val countCompleted = registrations.filter { it.status == "Donation Completed" }.size
     val countRejected = registrations.filter { it.status == "Donation Rejected" }.size
     val unitsCollected = countCompleted
+
+    val camp = state.nearbyCamps.find { it.id == campId }
+    val campTitle = camp?.title ?: "Downtown Blood Drive"
+    val campOrganizer = camp?.organizer ?: "Red Cross Center"
+    val campDate = camp?.dateText ?: "Oct 24 - 26"
+    val campAddress = camp?.address ?: "Tech Park Main Lobby"
+    val campStatus = camp?.status ?: "Active"
 
     var showScanner by remember { mutableStateOf(false) }
     var scanErrorText by remember { mutableStateOf<String?>(null) }
@@ -630,6 +756,13 @@ fun OrganizerDashboardScreen(
 
     var showScreeningDialogForReg: com.bloodlink.app.ui.CampRegistration? by remember { mutableStateOf(null) }
     var selectedRejectionReason by remember { mutableStateOf("Low Hemoglobin") }
+
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editTitle by remember { mutableStateOf(campTitle) }
+    var editAddress by remember { mutableStateOf(campAddress) }
+    var editDate by remember { mutableStateOf(campDate) }
+
+    var showExportDialog by remember { mutableStateOf(false) }
 
     val rejectionReasons = listOf(
         "Low Hemoglobin Count",
@@ -750,25 +883,93 @@ fun OrganizerDashboardScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(text = "Downtown Blood Drive", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                        Text(text = "Organized by Red Cross Center", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = campTitle, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        Text(text = "Organized by $campOrganizer", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Box(modifier = Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                        Text(text = "Live Now", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                    Box(modifier = Modifier.background(
+                        if (campStatus == "Cancelled") MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), 
+                        RoundedCornerShape(12.dp)
+                    ).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                        Text(
+                            text = if (campStatus == "Cancelled") "Cancelled" else "Live Now", 
+                            color = if (campStatus == "Cancelled") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, 
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                        )
                     }
                 }
 
                 HorizontalDivider()
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(text = "Target Goal:", style = MaterialTheme.typography.labelSmall)
-                    Text(text = "100 Units Pledge Campaign", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Text(text = "Venue Address:", style = MaterialTheme.typography.labelSmall)
+                    Text(text = campAddress, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
                 }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(text = "Date & Venue:", style = MaterialTheme.typography.labelSmall)
-                    Text(text = "Oct 24 - 26 • Tech Park Main Lobby", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                    Text(text = "Date & Time:", style = MaterialTheme.typography.labelSmall)
+                    Text(text = "$campDate", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                }
+
+                HorizontalDivider()
+
+                // Management Actions Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    IconButton(
+                        onClick = { showEditDialog = true },
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                            Text("Edit", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary))
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { onCancelCamp(campId) },
+                        modifier = Modifier
+                            .weight(1.5f)
+                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f), RoundedCornerShape(8.dp)),
+                        enabled = campStatus != "Cancelled"
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(imageVector = Icons.Default.Cancel, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                            Text(if (campStatus == "Cancelled") "Cancelled" else "Cancel", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error))
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { 
+                            onDeleteCamp(campId) 
+                            onNavigateBack()
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                            Text("Delete", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error))
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { showExportDialog = true },
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(imageVector = Icons.Default.FileDownload, contentDescription = "Export", tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
+                            Text("Export", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary))
+                        }
+                    }
                 }
             }
         }
@@ -1190,6 +1391,153 @@ fun OrganizerDashboardScreen(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
         )
     }
+
+    if (showEditDialog) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showEditDialog = false }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "Edit Camp Details",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                    )
+
+                    OutlinedTextField(
+                        value = editTitle,
+                        onValueChange = { editTitle = it },
+                        label = { Text("Camp Title") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = editAddress,
+                        onValueChange = { editAddress = it },
+                        label = { Text("Venue Address") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = editDate,
+                        onValueChange = { editDate = it },
+                        label = { Text("Date & Time") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showEditDialog = false },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Cancel")
+                        }
+
+                        Button(
+                            onClick = {
+                                onUpdateCamp(campId, editTitle, editAddress, editDate)
+                                showEditDialog = false
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Save")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showExportDialog) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showExportDialog = false }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "Export Donor Registry",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                    )
+
+                    Text(
+                        text = "Below is the CSV preview of all registered donors for this drive.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // CSV Preview Area
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
+                            .background(Color.Black.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                            .border(1.dp, Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        val csvContent = buildString {
+                            appendLine("Registration ID,Name,Blood Group,Status,Appointment")
+                            registrations.forEach { r ->
+                                appendLine("${r.registrationId},\"${r.donorName}\",${r.bloodGroup},${r.status},${r.selectedSlot}")
+                            }
+                        }
+                        Text(
+                            text = csvContent,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    var isExported by remember { mutableStateOf(false) }
+
+                    if (isExported) {
+                        Text(
+                            text = "✓ CSV Exported successfully to Downloads folder!",
+                            color = Color(0xFF4CAF50),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showExportDialog = false },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Close")
+                        }
+
+                        Button(
+                            onClick = {
+                                isExported = true
+                            },
+                            modifier = Modifier.weight(1.5f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Text("Download CSV", color = Color.White)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -1259,7 +1607,6 @@ fun CreateCampScreen(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text("Camp Campaign Title") },
-                    placeholder = { Text("E.g. Metropolitain Center Drive") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -1268,7 +1615,6 @@ fun CreateCampScreen(
                     value = host,
                     onValueChange = { host = it },
                     label = { Text("Host Organization") },
-                    placeholder = { Text("American Red Cross") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -1277,7 +1623,6 @@ fun CreateCampScreen(
                     value = address,
                     onValueChange = { address = it },
                     label = { Text("Physical Address") },
-                    placeholder = { Text("1200 Metropolitan Ave, Suite 100") },
                     leadingIcon = { Icon(imageVector = Icons.Default.LocationOn, contentDescription = "Pin") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)

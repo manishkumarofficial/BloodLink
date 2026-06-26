@@ -182,30 +182,43 @@ object BloodRepository {
     // CRUD Operations
 
     suspend fun createUserProfile(user: FUser) {
-        try {
-            db.collection("users").document(user.userId).set(user).await()
-            Log.d(TAG, "Successfully created user profile: ${user.userId}")
-            
-            // Intialize user statistics and cooldown
-            val initialStats = FUserStatistics(
-                userId = user.userId,
-                totalDonations = user.donationCount,
-                livesSaved = user.livesSaved,
-                level = user.heroLevel
-            )
-            val initialCooldown = FCooldown(
-                userId = user.userId,
-                status = user.cooldownStatus,
-                nextEligibleDate = user.nextEligibleDate
-            )
-            db.collection("user_statistics").document(user.userId).set(initialStats).await()
-            db.collection("cooldowns").document(user.userId).set(initialCooldown).await()
-            
-            logAction("CREATE_USER", user.userId, user.userId, "User registration initialized successfully")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error creating user profile: ${e.message}", e)
-            throw e
+        FirebaseConfigService.runLoggedWrite("users", user.userId, user) {
+            FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(user.userId)
+                .set(user)
+                .await()
         }
+        Log.d(TAG, "Successfully created user profile: ${user.userId}")
+        
+        // Intialize user statistics and cooldown
+        val initialStats = FUserStatistics(
+            userId = user.userId,
+            totalDonations = user.donationCount,
+            livesSaved = user.livesSaved,
+            level = user.heroLevel
+        )
+        val initialCooldown = FCooldown(
+            userId = user.userId,
+            status = user.cooldownStatus,
+            nextEligibleDate = user.nextEligibleDate
+        )
+        FirebaseConfigService.runLoggedWrite("user_statistics", user.userId, initialStats) {
+            FirebaseFirestore.getInstance()
+                .collection("user_statistics")
+                .document(user.userId)
+                .set(initialStats)
+                .await()
+        }
+        FirebaseConfigService.runLoggedWrite("cooldowns", user.userId, initialCooldown) {
+            FirebaseFirestore.getInstance()
+                .collection("cooldowns")
+                .document(user.userId)
+                .set(initialCooldown)
+                .await()
+        }
+        
+        logAction("CREATE_USER", user.userId, user.userId, "User registration initialized successfully")
     }
 
     suspend fun getUserProfile(userId: String): FUser? {
@@ -235,79 +248,76 @@ object BloodRepository {
         }
     }
 
-    suspend fun updateUserProfile(user: FUser) {
+    suspend fun getUserProfileByEmail(email: String): FUser? {
         try {
-            db.collection("users").document(user.userId).set(user).await()
-            Log.d(TAG, "Successfully updated user profile: ${user.userId}")
-            logAction("UPDATE_USER", user.userId, user.userId, "User profile updated fields")
+            val query = db.collection("users").whereEqualTo("email", email).limit(1).get().await()
+            if (!query.isEmpty) {
+                val doc = query.documents.first()
+                return doc.toObject(FUser::class.java)?.copy(userId = doc.id)
+            }
+            return null
         } catch (e: Exception) {
-            Log.e(TAG, "Error updating profile for ${user.userId}: ${e.message}", e)
-            throw e
+            Log.e(TAG, "Error fetching user by email $email: ${e.message}", e)
+            return null
         }
+    }
+
+    suspend fun updateUserProfile(user: FUser) {
+        FirebaseConfigService.runLoggedWrite("users", user.userId, user) {
+            db.collection("users").document(user.userId).set(user).await()
+        }
+        Log.d(TAG, "Successfully updated user profile: ${user.userId}")
+        logAction("UPDATE_USER", user.userId, user.userId, "User profile updated fields")
     }
 
     suspend fun createBloodRequest(request: FBloodRequest) {
-        try {
-            val docRef = if (request.id.isBlank()) {
-                db.collection("blood_requests").document()
-            } else {
-                db.collection("blood_requests").document(request.id)
-            }
-            val requestWithId = request.copy(id = docRef.id)
-            docRef.set(requestWithId).await()
-            Log.d(TAG, "Successfully created blood request: ${requestWithId.id}")
-            logAction("CREATE_BLOOD_REQUEST", requestWithId.requesterId, requestWithId.id, "Blood request generated for group ${requestWithId.bloodGroup}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error saving blood request: ${e.message}", e)
-            throw e
+        val docRef = if (request.id.isBlank()) {
+            db.collection("blood_requests").document()
+        } else {
+            db.collection("blood_requests").document(request.id)
         }
+        val requestWithId = request.copy(id = docRef.id)
+        FirebaseConfigService.runLoggedWrite("blood_requests", requestWithId.id, requestWithId) {
+            docRef.set(requestWithId).await()
+        }
+        Log.d(TAG, "Successfully created blood request: ${requestWithId.id}")
+        logAction("CREATE_BLOOD_REQUEST", requestWithId.requesterId, requestWithId.id, "Blood request generated for group ${requestWithId.bloodGroup}")
     }
 
     suspend fun updateBloodRequest(request: FBloodRequest) {
-        try {
+        FirebaseConfigService.runLoggedWrite("blood_requests", request.id, request) {
             db.collection("blood_requests").document(request.id).set(request).await()
-            Log.d(TAG, "Updated blood request: ${request.id}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error updating blood request: ${e.message}", e)
         }
+        Log.d(TAG, "Updated blood request: ${request.id}")
     }
 
     suspend fun createCamp(camp: FDonationCamp) {
-        try {
-            val docRef = if (camp.id.isBlank()) db.collection("camps").document() else db.collection("camps").document(camp.id)
-            val campWithId = camp.copy(id = docRef.id)
+        val docRef = if (camp.id.isBlank()) db.collection("camps").document() else db.collection("camps").document(camp.id)
+        val campWithId = camp.copy(id = docRef.id)
+        FirebaseConfigService.runLoggedWrite("camps", campWithId.id, campWithId) {
             docRef.set(campWithId).await()
-            Log.d(TAG, "Successfully published donation camp: ${campWithId.id}")
-            logAction("CREATE_CAMP", campWithId.organizerId, campWithId.id, "Published camp ${campWithId.title}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error saving camp: ${e.message}", e)
-            throw e
         }
+        Log.d(TAG, "Successfully published donation camp: ${campWithId.id}")
+        logAction("CREATE_CAMP", campWithId.organizerId, campWithId.id, "Published camp ${campWithId.title}")
     }
 
     suspend fun registerForCamp(registration: FCampRegistration) {
-        try {
-            val docRef = if (registration.registrationId.isBlank()) {
-                db.collection("camp_registrations").document()
-            } else {
-                db.collection("camp_registrations").document(registration.registrationId)
-            }
-            val regWithId = registration.copy(registrationId = docRef.id)
-            docRef.set(regWithId).await()
-            Log.d(TAG, "Donor registered successfully for camp: ${regWithId.registrationId}")
-            logAction("REGISTER_CAMP", regWithId.donorId, regWithId.registrationId, "Registered slot ${regWithId.selectedSlot} at camp ${regWithId.campId}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error registering for camp: ${e.message}", e)
-            throw e
+        val docRef = if (registration.registrationId.isBlank()) {
+            db.collection("camp_registrations").document()
+        } else {
+            db.collection("camp_registrations").document(registration.registrationId)
         }
+        val regWithId = registration.copy(registrationId = docRef.id)
+        FirebaseConfigService.runLoggedWrite("camp_registrations", regWithId.registrationId, regWithId) {
+            docRef.set(regWithId).await()
+        }
+        Log.d(TAG, "Donor registered successfully for camp: ${regWithId.registrationId}")
+        logAction("REGISTER_CAMP", regWithId.donorId, regWithId.registrationId, "Registered slot ${regWithId.selectedSlot} at camp ${regWithId.campId}")
     }
 
     suspend fun updateCampRegistration(registration: FCampRegistration) {
-        try {
+        FirebaseConfigService.runLoggedWrite("camp_registrations", registration.registrationId, registration) {
             db.collection("camp_registrations").document(registration.registrationId).set(registration).await()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error updating registration: ${e.message}", e)
-            throw e
         }
     }
 
@@ -325,29 +335,28 @@ object BloodRepository {
     }
 
     suspend fun confirmDonation(record: FDonationHistoryRecord) {
-        try {
-            val docRef = db.collection("donation_history").document(record.donationId)
-            
-            // Handle duplicate detection safely
-            if (docRef.get().await().exists()) {
-                throw IllegalStateException("Duplicate Record: Donation ID ${record.donationId} has already been verified and logged.")
-            }
-            
-            docRef.set(record).await()
-            Log.d(TAG, "Successfully confirmed verification and logged donation: ${record.donationId}")
-            
-            // Log verification trace explicitly
-            logAction("DONATION_CONFIRM", record.donorId, record.donationId, "Log verification completes for requestId ${record.requestId}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error logging donation entry: ${e.message}", e)
-            throw e
+        val docRef = db.collection("donation_history").document(record.donationId)
+        
+        // Handle duplicate detection safely
+        if (docRef.get().await().exists()) {
+            throw IllegalStateException("Duplicate Record: Donation ID ${record.donationId} has already been verified and logged.")
         }
+        
+        FirebaseConfigService.runLoggedWrite("donation_history", record.donationId, record) {
+            docRef.set(record).await()
+        }
+        Log.d(TAG, "Successfully confirmed verification and logged donation: ${record.donationId}")
+        
+        // Log verification trace explicitly
+        logAction("DONATION_CONFIRM", record.donorId, record.donationId, "Log verification completes for requestId ${record.requestId}")
     }
 
     suspend fun updateCooldown(userId: String, status: String, remainingDays: Int, nextEligibleDate: String) {
         try {
             val cd = FCooldown(userId, status, remainingDays, nextEligibleDate)
-            db.collection("cooldowns").document(userId).set(cd).await()
+            FirebaseConfigService.runLoggedWrite("cooldowns", userId, cd) {
+                db.collection("cooldowns").document(userId).set(cd).await()
+            }
             
             // Also sink to user document
             val userRef = db.collection("users").document(userId)
@@ -355,10 +364,13 @@ object BloodRepository {
             if (userSnap.exists()) {
                 val user = userSnap.toObject(FUser::class.java)
                 if (user != null) {
-                    userRef.set(user.copy(
+                    val updatedUser = user.copy(
                         cooldownStatus = status,
                         nextEligibleDate = nextEligibleDate
-                    )).await()
+                    )
+                    FirebaseConfigService.runLoggedWrite("users", userId, updatedUser) {
+                        userRef.set(updatedUser).await()
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -368,7 +380,9 @@ object BloodRepository {
 
     suspend fun updateAchievements(achievement: FAchievement) {
         try {
-            db.collection("achievements").document(achievement.id).set(achievement).await()
+            FirebaseConfigService.runLoggedWrite("achievements", achievement.id, achievement) {
+                db.collection("achievements").document(achievement.id).set(achievement).await()
+            }
             Log.d(TAG, "Locked/Unlocked Achievement stored: ${achievement.id}")
         } catch (e: Exception) {
             Log.e(TAG, "Error storing achievements: ${e.message}")
@@ -378,7 +392,10 @@ object BloodRepository {
     suspend fun storeNotification(notification: FNotification) {
         try {
             val docRef = if (notification.id.isBlank()) db.collection("notifications").document() else db.collection("notifications").document(notification.id)
-            docRef.set(notification.copy(id = docRef.id)).await()
+            val updatedNotification = notification.copy(id = docRef.id)
+            FirebaseConfigService.runLoggedWrite("notifications", updatedNotification.id, updatedNotification) {
+                docRef.set(updatedNotification).await()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error storing notification record: ${e.message}")
         }
@@ -386,7 +403,9 @@ object BloodRepository {
 
     suspend fun updateUserStatistics(stats: FUserStatistics) {
         try {
-            db.collection("user_statistics").document(stats.userId).set(stats).await()
+            FirebaseConfigService.runLoggedWrite("user_statistics", stats.userId, stats) {
+                db.collection("user_statistics").document(stats.userId).set(stats).await()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error updating statistics: ${e.message}")
         }
@@ -404,7 +423,9 @@ object BloodRepository {
                 details = details,
                 timestamp = System.currentTimeMillis()
             )
-            db.collection("verification_logs").document(logId).set(log).await()
+            FirebaseConfigService.runLoggedWrite("verification_logs", logId, log) {
+                db.collection("verification_logs").document(logId).set(log).await()
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed logging action trace: ${e.message}")
         }

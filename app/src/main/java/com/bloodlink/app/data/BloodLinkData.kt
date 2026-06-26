@@ -7,6 +7,7 @@ data class FUser(
     val fullName: String = "",
     val phoneNumber: String = "",
     val email: String = "",
+    val passwordHash: String = "",
     val gender: String = "",
     val dateOfBirth: String = "",
     val role: String = "Donor", // "Donor", "Requester", "Organizer"
@@ -59,7 +60,29 @@ data class FDonationCamp(
     val imageUrl: String = "",
     val mapUrl: String = "",
     val isUrgent: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val campName: String = "",
+    val organizerName: String = "",
+    val organization: String = "",
+    val phone: String = "",
+    val email: String = "",
+    val date: String = "",
+    val startTime: String = "",
+    val endTime: String = "",
+    val city: String = "",
+    val state: String = "",
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    val description: String = "",
+    val bannerUrl: String = "",
+    val participantsCount: Int = 0,
+    val maxParticipants: Int = 100,
+    val status: String = "Active", // "Active", "Cancelled", "Completed"
+    val facilities: List<String> = emptyList(),
+    val parkingAvailable: Boolean = true,
+    val refreshmentsAvailable: Boolean = true,
+    val medicalTeamDetails: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 data class FCampRegistration(
