@@ -293,7 +293,7 @@ object BloodRepository {
 
     suspend fun createCamp(camp: FDonationCamp) {
         val docRef = if (camp.id.isBlank()) db.collection("camps").document() else db.collection("camps").document(camp.id)
-        val campWithId = camp.copy(id = docRef.id)
+        val campWithId = camp.copy(id = docRef.id, campId = docRef.id)
         FirebaseConfigService.runLoggedWrite("camps", campWithId.id, campWithId) {
             docRef.set(campWithId).await()
         }

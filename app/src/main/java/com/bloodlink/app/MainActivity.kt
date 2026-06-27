@@ -50,7 +50,8 @@ enum class Screen(val route: String) {
     AcceptedRequestDetails("accepted_request_details"),
     QRVerification("qr_verification"),
     DonationSuccess("donation_success"),
-    Settings("settings")
+    Settings("settings"),
+    CampManagement("camp_management")
 }
 
 class MainActivity : ComponentActivity() {
@@ -86,7 +87,7 @@ fun BloodLinkApp() {
             TabItem("Home", Screen.HomeDashboard.route, Icons.Default.Home),
             TabItem("Requests", Screen.ActiveRequests.route, Icons.Default.Bloodtype),
             TabItem("Camps", Screen.NearbyCamps.route, Icons.Default.Campaign),
-            TabItem("Alerts", Screen.Notifications.route, Icons.Default.Notifications),
+            TabItem("History", Screen.Achievements.route, Icons.Default.History),
             TabItem("Profile", Screen.UserProfile.route, Icons.Default.Person)
         )
     }
@@ -96,7 +97,7 @@ fun BloodLinkApp() {
         Screen.HomeDashboard.route,
         Screen.ActiveRequests.route,
         Screen.NearbyCamps.route,
-        Screen.Notifications.route,
+        Screen.Achievements.route,
         Screen.UserProfile.route
     )
 
@@ -298,6 +299,16 @@ fun BloodLinkApp() {
                     onNavigateCreateCamp = {
                         navController.navigate(Screen.CreateCamp.route)
                     },
+                    onOpenDashboard = { campId ->
+                        viewModel.selectCamp(campId)
+                        navController.navigate(Screen.OrganizerDashboard.route)
+                    },
+                    onEditCamp = { campId, title, address, date ->
+                        viewModel.updateCamp(campId, title, address, date)
+                    },
+                    onDeleteCamp = { campId ->
+                        viewModel.deleteCamp(campId)
+                    },
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
@@ -412,39 +423,43 @@ fun BloodLinkApp() {
                     onRejectDonation = { regId, reason -> viewModel.rejectCampDonation(regId, reason) },
                     onCancelCamp = { campId -> viewModel.cancelCamp(campId) },
                     onDeleteCamp = { campId -> viewModel.deleteCamp(campId) },
-                    onUpdateCamp = { campId, title, address, date -> viewModel.updateCamp(campId, title, address, date) }
+                    onUpdateCamp = { campId, title, address, date -> viewModel.updateCamp(campId, title, address, date) },
+                    onPauseCamp = { campId -> viewModel.pauseCampRegistration(campId) },
+                    onResumeCamp = { campId -> viewModel.resumeCampRegistration(campId) },
+                    onCloseCamp = { campId -> viewModel.closeCampRegistration(campId) },
+                    onNotifyCamp = { campId, title, msg -> viewModel.notifyCampParticipants(campId, title, msg) },
+                    onDuplicateCamp = { campId, title, date -> viewModel.duplicateCamp(campId, title, date) }
+                )
+            }
+
+            composable(Screen.CampManagement.route) {
+                CampManagementScreen(
+                    state = state,
+                    onNavigateCreateCamp = { navController.navigate(Screen.CreateCamp.route) },
+                    onOpenDashboard = { campId ->
+                        viewModel.selectCamp(campId)
+                        navController.navigate(Screen.OrganizerDashboard.route)
+                    },
+                    onEditCamp = { campId, title, address, date ->
+                        viewModel.updateCamp(campId, title, address, date)
+                    },
+                    onDeleteCamp = { campId ->
+                        viewModel.deleteCamp(campId)
+                    },
+                    onBack = { navController.popBackStack() }
                 )
             }
 
             composable(Screen.CreateCamp.route) {
                 CreateCampScreen(
                     state = state,
-                    onPublish = { title, host, address ->
-                        viewModel.publishCamp(
-                            campName = title,
-                            organizerName = host,
-                            organization = host,
-                            phone = "555-0199",
-                            email = "info@bloodlink.org",
-                            date = "Oct 28, 2026",
-                            startTime = "09:00 AM",
-                            endTime = "05:00 PM",
-                            address = address,
-                            city = "Metropolis",
-                            stateName = "NY",
-                            latitude = 40.7128,
-                            longitude = -74.0060,
-                            description = "Join our mobile blood donation drive and help save lives in our community.",
-                            bannerUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuCK_nMDb8Z_tA5-a_o2fS6vU3W6bI_yXz_qEG8n_8H6m1_f69C97X_s92tVp_z4XG6K5N_287vU8sXLdf7O8Y_f_a4-4vTU-aX5-u9N8_Uo_v-1",
-                            maxParticipants = 150,
-                            bloodGroupsNeeded = listOf("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"),
-                            facilities = listOf("Air Conditioned Lounge", "Sterile Testing Kits", "Pre-Donation Screening"),
-                            parkingAvailable = true,
-                            refreshmentsAvailable = true,
-                            medicalTeamDetails = "Led by Dr. Helen Cho, ARC Medical Director"
-                        )
-                        navController.navigate(Screen.NearbyCamps.route) {
-                            popUpTo(Screen.NearbyCamps.route) { inclusive = true }
+                    onPublish = { camp ->
+                        viewModel.publishCamp(camp)
+                    },
+                    onNavigateDashboard = { campId ->
+                        viewModel.selectCamp(campId)
+                        navController.navigate(Screen.OrganizerDashboard.route) {
+                            popUpTo(Screen.NearbyCamps.route)
                         }
                     },
                     onBack = { navController.popBackStack() }

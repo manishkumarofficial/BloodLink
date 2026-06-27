@@ -839,73 +839,17 @@ class BloodLinkViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun publishCamp(
-        campName: String,
-        organizerName: String,
-        organization: String,
-        phone: String,
-        email: String,
-        date: String,
-        startTime: String,
-        endTime: String,
-        address: String,
-        city: String,
-        stateName: String,
-        latitude: Double,
-        longitude: Double,
-        description: String,
-        bannerUrl: String,
-        maxParticipants: Int,
-        bloodGroupsNeeded: List<String>,
-        facilities: List<String>,
-        parkingAvailable: Boolean,
-        refreshmentsAvailable: Boolean,
-        medicalTeamDetails: String
-    ) {
+    fun publishCamp(camp: FDonationCamp) {
         val state = _uiState.value
         viewModelScope.launch {
             try {
-                val camp = FDonationCamp(
-                    title = campName,
-                    organizer = organizerName,
-                    organizerId = state.profile.id,
-                    address = address,
-                    distanceText = "1.2 mi",
-                    dateText = date,
-                    timeText = "$startTime - $endTime",
-                    bloodGroupsNeeded = bloodGroupsNeeded,
-                    imageUrl = if (bannerUrl.isNotBlank()) bannerUrl else "https://lh3.googleusercontent.com/aida-public/AB6AXuCwGHyxisPgOArtiO-XpMExa07NS6q-hjXUR_oqw8nZo0lyc517bcB4cQiBKb7u8sczMJZq5wMgk6qGhMtwOlST2YmeP2ssyVV9ww0l7JD8o82CI1H6yo-z7QPqyg6vVHvK4Iwm-0Adk_aFPkW0kueRwk-hNLdAdkuTj9a8EbyfwiNqvfOjJ0_4LfMEA9Y-xI-lnGEtMw-XXTKIKk6viZVeRYfsngAFobYSwGaEkctbO9YLkGcu8sa6NfbSrlEFzhhW0cFwp0_8ZiE",
-                    mapUrl = "https://maps.google.com/?q=$latitude,$longitude",
-                    isUrgent = false,
-                    campName = campName,
-                    organizerName = organizerName,
-                    organization = organization,
-                    phone = phone,
-                    email = email,
-                    date = date,
-                    startTime = startTime,
-                    endTime = endTime,
-                    city = city,
-                    state = stateName,
-                    latitude = latitude,
-                    longitude = longitude,
-                    description = description,
-                    bannerUrl = if (bannerUrl.isNotBlank()) bannerUrl else "https://lh3.googleusercontent.com/aida-public/AB6AXuCwGHyxisPgOArtiO-XpMExa07NS6q-hjXUR_oqw8nZo0lyc517bcB4cQiBKb7u8sczMJZq5wMgk6qGhMtwOlST2YmeP2ssyVV9ww0l7JD8o82CI1H6yo-z7QPqyg6vVHvK4Iwm-0Adk_aFPkW0kueRwk-hNLdAdkuTj9a8EbyfwiNqvfOjJ0_4LfMEA9Y-xI-lnGEtMw-XXTKIKk6viZVeRYfsngAFobYSwGaEkctbO9YLkGcu8sa6NfbSrlEFzhhW0cFwp0_8ZiE",
-                    participantsCount = 0,
-                    maxParticipants = maxParticipants,
-                    status = "Active",
-                    facilities = facilities,
-                    parkingAvailable = parkingAvailable,
-                    refreshmentsAvailable = refreshmentsAvailable,
-                    medicalTeamDetails = medicalTeamDetails
-                )
                 BloodRepository.createCamp(camp)
                 
                 // Store registration notification
                 val notification = FNotification(
                     userId = state.profile.id,
                     title = "Camp Published",
-                    body = "Your donation camp \"$campName\" has been successfully scheduled and published.",
+                    body = "Your donation camp \"${camp.title}\" has been successfully scheduled and published.",
                     timestamp = System.currentTimeMillis()
                 )
                 BloodRepository.storeNotification(notification)
@@ -1214,10 +1158,80 @@ class BloodLinkViewModel(application: Application) : AndroidViewModel(applicatio
                 )
                 BloodRepository.confirmDonation(record)
                 
-                val isCurrentDonor = uiStateVal.profile.id == reg.donorId || reg.donorId == "alex_rivera_id"
-                val cooldownDays = if (uiStateVal.profile.gender.equals("Male", ignoreCase = true)) 90 else 120
+                val db = FirebaseConfigService.firestore
+                var donorGender = "Male"
+                if (db != null) {
+                    // Try to get donor's gender, stats and cooldown info
+                    try {
+                        val userSnap = db.collection("users").document(reg.donorId).get().await()
+                        if (userSnap.exists()) {
+                            donorGender = userSnap.getString("gender") ?: "Male"
+                        }
+                    } catch (e: Exception) {
+                        Log.e("BloodLinkViewModel", "Error fetching user gender: ${e.message}")
+                    }
+
+                    // Update or create donor statistics
+                    try {
+                        val statsRef = db.collection("user_statistics").document(reg.donorId)
+                        val statsSnap = statsRef.get().await()
+                        val stats = if (statsSnap.exists()) {
+                            statsSnap.toObject(FUserStatistics::class.java)!!
+                        } else {
+                            FUserStatistics(userId = reg.donorId)
+                        }
+                        val newTotal = stats.totalDonations + 1
+                        val newLives = stats.livesSaved + 3
+                        val newXp = stats.totalXp + 150
+                        val newLevelNum = (newXp / 200).coerceAtLeast(1)
+                        val updatedStats = stats.copy(
+                            totalDonations = newTotal,
+                            livesSaved = newLives,
+                            totalXp = newXp,
+                            level = "Level $newLevelNum Life-Saver",
+                            currentStreak = stats.currentStreak + 1
+                        )
+                        BloodRepository.updateUserStatistics(updatedStats)
+                    } catch (e: Exception) {
+                        Log.e("BloodLinkViewModel", "Error updating donor statistics: ${e.message}")
+                    }
+                }
+
+                val cooldownDays = if (donorGender.equals("Male", ignoreCase = true)) 90 else 120
                 val eligibleDateStr = now.plusDays(cooldownDays.toLong()).format(java.time.format.DateTimeFormatter.ofPattern("dd MMMM yyyy"))
                 
+                // Set donation cooldown in Firestore
+                BloodRepository.updateCooldown(reg.donorId, "Cooldown", cooldownDays, eligibleDateStr)
+
+                // Generate donor achievement
+                val achievement = FAchievement(
+                    id = "ach_${System.currentTimeMillis()}",
+                    userId = reg.donorId,
+                    title = "Humbled Hero",
+                    description = "Logged your verified real-time blood donation at $campName",
+                    xpAwarded = 150
+                )
+                BloodRepository.updateAchievements(achievement)
+
+                // Generate thank you notification for the donor
+                val thankYouNotification = FNotification(
+                    userId = reg.donorId,
+                    title = "Donation Verified!",
+                    body = "Your donation at \"$campName\" has been verified. You saved up to 3 lives! Cooldown active until $eligibleDateStr.",
+                    timestamp = System.currentTimeMillis()
+                )
+                BloodRepository.storeNotification(thankYouNotification)
+
+                // Generate camp notification for organizer / general logs
+                val organizerNotification = FNotification(
+                    userId = uiStateVal.profile.id,
+                    title = "Donation Verified",
+                    body = "Successfully verified donation of ${reg.donorName} (${reg.bloodGroup}) at \"$campName\".",
+                    timestamp = System.currentTimeMillis()
+                )
+                BloodRepository.storeNotification(organizerNotification)
+
+                val isCurrentDonor = uiStateVal.profile.id == reg.donorId || reg.donorId == "alex_rivera_id"
                 if (isCurrentDonor) {
                     val newXp = uiStateVal.profile.xp + 150
                     val newLevelNum = (newXp / 200).coerceAtLeast(4)
@@ -1313,6 +1327,135 @@ class BloodLinkViewModel(application: Application) : AndroidViewModel(applicatio
                 db.collection("camps").document(campId).update(updates).await()
             } catch (e: Exception) {
                 Log.e("BloodLinkViewModel", "updateCamp failed: ${e.message}")
+            }
+        }
+    }
+
+    fun pauseCampRegistration(campId: String) {
+        viewModelScope.launch {
+            try {
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                db.collection("camps").document(campId).update("status", "Paused").await()
+                _uiState.update { state ->
+                    val updatedCamps = state.nearbyCamps.map {
+                        if (it.id == campId) it.copy(status = "Paused") else it
+                    }
+                    state.copy(nearbyCamps = updatedCamps)
+                }
+            } catch (e: Exception) {
+                Log.e("BloodLinkViewModel", "pauseCampRegistration failed: ${e.message}")
+            }
+        }
+    }
+
+    fun resumeCampRegistration(campId: String) {
+        viewModelScope.launch {
+            try {
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                db.collection("camps").document(campId).update("status", "Active").await()
+                _uiState.update { state ->
+                    val updatedCamps = state.nearbyCamps.map {
+                        if (it.id == campId) it.copy(status = "Active") else it
+                    }
+                    state.copy(nearbyCamps = updatedCamps)
+                }
+            } catch (e: Exception) {
+                Log.e("BloodLinkViewModel", "resumeCampRegistration failed: ${e.message}")
+            }
+        }
+    }
+
+    fun closeCampRegistration(campId: String) {
+        viewModelScope.launch {
+            try {
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                db.collection("camps").document(campId).update("status", "Closed").await()
+                _uiState.update { state ->
+                    val updatedCamps = state.nearbyCamps.map {
+                        if (it.id == campId) it.copy(status = "Closed") else it
+                    }
+                    state.copy(nearbyCamps = updatedCamps)
+                }
+            } catch (e: Exception) {
+                Log.e("BloodLinkViewModel", "closeCampRegistration failed: ${e.message}")
+            }
+        }
+    }
+
+    fun notifyCampParticipants(campId: String, title: String, message: String) {
+        viewModelScope.launch {
+            try {
+                val state = _uiState.value
+                val registrations = state.campRegistrations.filter { it.campId == campId }
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                registrations.forEach { reg ->
+                    val notification = FNotification(
+                        userId = reg.donorId,
+                        title = title,
+                        body = message,
+                        timestamp = System.currentTimeMillis()
+                    )
+                    db.collection("notifications").add(notification).await()
+                }
+                
+                val successNotif = FNotification(
+                    userId = state.profile.id,
+                    title = "Broadcast Sent",
+                    body = "Your emergency broadcast was successfully sent to ${registrations.size} registered participants of \"${state.nearbyCamps.find { it.id == campId }?.title ?: ""}\".",
+                    timestamp = System.currentTimeMillis()
+                )
+                db.collection("notifications").add(successNotif).await()
+            } catch (e: Exception) {
+                Log.e("BloodLinkViewModel", "notifyCampParticipants failed: ${e.message}")
+            }
+        }
+    }
+
+    fun duplicateCamp(campId: String, newTitle: String, newDate: String) {
+        viewModelScope.launch {
+            try {
+                val state = _uiState.value
+                val origCamp = state.nearbyCamps.find { it.id == campId } ?: return@launch
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                val newDocRef = db.collection("camps").document()
+                val duplicated = FDonationCamp(
+                    id = newDocRef.id,
+                    title = newTitle,
+                    organizer = origCamp.organizer,
+                    organizerId = state.profile.id,
+                    address = origCamp.address,
+                    distanceText = origCamp.distanceText,
+                    dateText = newDate,
+                    timeText = origCamp.timeText,
+                    bloodGroupsNeeded = origCamp.bloodGroupsNeeded,
+                    imageUrl = origCamp.imageUrl,
+                    mapUrl = origCamp.mapUrl,
+                    isUrgent = origCamp.isUrgent,
+                    campName = newTitle,
+                    organizerName = origCamp.organizerName,
+                    organization = origCamp.organization,
+                    phone = origCamp.phone,
+                    email = origCamp.email,
+                    date = newDate,
+                    startTime = origCamp.startTime,
+                    endTime = origCamp.endTime,
+                    city = origCamp.city,
+                    state = origCamp.state,
+                    latitude = origCamp.latitude,
+                    longitude = origCamp.longitude,
+                    description = origCamp.description,
+                    bannerUrl = origCamp.bannerUrl,
+                    participantsCount = 0,
+                    maxParticipants = origCamp.maxParticipants,
+                    status = "Active",
+                    facilities = origCamp.facilities,
+                    parkingAvailable = origCamp.parkingAvailable,
+                    refreshmentsAvailable = origCamp.refreshmentsAvailable,
+                    medicalTeamDetails = origCamp.medicalTeamDetails
+                )
+                newDocRef.set(duplicated).await()
+            } catch (e: Exception) {
+                Log.e("BloodLinkViewModel", "duplicateCamp failed: ${e.message}")
             }
         }
     }

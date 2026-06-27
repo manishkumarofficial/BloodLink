@@ -1770,7 +1770,7 @@ fun AchievementsProgressScreen(
     onBack: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("Levels & Badges", "Countdown", "History Timeline", "Hero Wall")
+    val tabs = listOf("History Timeline", "Levels & Badges", "Countdown", "Hero Wall")
 
     Column(
         modifier = Modifier
@@ -1788,7 +1788,7 @@ fun AchievementsProgressScreen(
             IconButton(onClick = onBack) {
                 Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
             }
-            Text(text = "Impact & Gamification", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+            Text(text = "Impact Dashboard", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
             Box(modifier = Modifier.size(48.dp))
         }
 
@@ -1815,7 +1815,7 @@ fun AchievementsProgressScreen(
                 .weight(1f)
         ) {
             when (selectedTab) {
-                0 -> { // Levels & Badges (Gamification)
+                1 -> { // Levels & Badges (Gamification)
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -1871,7 +1871,7 @@ fun AchievementsProgressScreen(
                         }
                     }
                 }
-                1 -> { // Eligible Countdown (Countdown screen)
+                2 -> { // Eligible Countdown (Countdown screen)
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -1936,7 +1936,7 @@ fun AchievementsProgressScreen(
                         }
                     }
                 }
-                2 -> { // Donation History Timeline
+                0 -> { // Donation History Timeline
                     var yearFilter by remember { mutableStateOf("All Years") }
 
                     Column(
